@@ -1,0 +1,38 @@
+{
+  "name": "crystal-bot",
+  "version": "1.0.0",
+  "description": "Made by https://Twitch.tv/mimi_py",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@twurple/api": "^7.2.1",
+    "@twurple/auth": "^7.2.1",
+    "@twurple/chat": "^7.2.1",
+    "@twurple/easy-bot": "^7.2.1",
+    "@twurple/eventsub-http": "^7.2.1",
+    "@twurple/eventsub-ws": "^7.2.1",
+    "@twurple/pubsub": "^7.2.1",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "twurple": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.126",
+    "@types/ws": "^8.0.0",
+    "discord.js": "^14.14.1",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.8.2"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "typescript"
+  ],
+  "author": "Mimi_py",
+  "license": "MIT"
+}
