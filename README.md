@@ -111,4 +111,4 @@ Made by [Mimi_py](https://twitch.tv/mimi_py)
 
 ## Support
 
-For support, join our [Discord server](your_discord_invite_link) or create an issue on GitHub.
+For support, join our [Discord server](https://discord.gg/sQayGNDsQV) or create an issue on GitHub.
