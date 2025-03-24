@@ -1,9 +1,34 @@
 {
-    "listUpdated": 1742664871288,
-    "totalFollowers": 1256,
+    "listUpdated": 1742777031580,
+    "totalFollowers": 1258,
     "totalUnfollowed": 0,
     "unfollowedUsers": [],
     "followers": [
+        {
+            "user": "sanelmaosrs",
+            "userId": "60798270",
+            "createdAt": "2025-03-23T19:16:17.000Z"
+        },
+        {
+            "user": "nottamimic",
+            "userId": "1209926456",
+            "createdAt": "2025-03-23T16:20:38.000Z"
+        },
+        {
+            "user": "zcqck",
+            "userId": "732742630",
+            "createdAt": "2025-03-23T13:54:10.000Z"
+        },
+        {
+            "user": "HexGirlsOnADHD",
+            "userId": "1163032738",
+            "createdAt": "2025-03-22T19:49:13.000Z"
+        },
+        {
+            "user": "matyussy",
+            "userId": "855921366",
+            "createdAt": "2025-03-22T19:26:29.000Z"
+        },
         {
             "user": "JeanTVx",
             "userId": "464059527",
@@ -2850,11 +2875,6 @@
             "createdAt": "2024-09-30T14:41:39.000Z"
         },
         {
-            "user": "HexFem8oi",
-            "userId": "1015026038",
-            "createdAt": "2024-09-30T02:27:31.000Z"
-        },
-        {
             "user": "techno_syn",
             "userId": "1110046014",
             "createdAt": "2024-09-29T09:38:06.000Z"
@@ -2948,11 +2968,6 @@
             "user": "LFT_Yvonne",
             "userId": "801775394",
             "createdAt": "2024-09-20T06:02:17.000Z"
-        },
-        {
-            "user": "Student_Of_Cakes000",
-            "userId": "602640774",
-            "createdAt": "2024-09-20T00:18:40.000Z"
         },
         {
             "user": "slft",
@@ -3898,11 +3913,6 @@
             "user": "jayzed19",
             "userId": "103698821",
             "createdAt": "2024-06-26T05:13:47.000Z"
-        },
-        {
-            "user": "Explowd_",
-            "userId": "228319769",
-            "createdAt": "2024-06-26T04:54:42.000Z"
         },
         {
             "user": "tvflixy",

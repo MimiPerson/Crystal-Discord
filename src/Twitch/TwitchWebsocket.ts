@@ -1,7 +1,7 @@
 import { ApiClient, HelixUser } from "@twurple/api";
 import { RefreshingAuthProvider } from "@twurple/auth";
 import { EventSubWsListener } from "@twurple/eventsub-ws";
-import { promises as fs, writeFile } from "fs";
+import { promises as fs } from "fs";
 import {
   ChatAnnouncementInfo,
   ChatClient,
@@ -9,28 +9,46 @@ import {
   ClearChat,
   UserNotice,
 } from "@twurple/chat";
-import { EventSubChannelChatMessageEvent } from "@twurple/eventsub-base/lib/events/EventSubChannelChatMessageEvent";
-import { LogAsUser } from "../DiscordBot/DiscordBot";
+
 import {
   EventSubChannelRedemptionAddEvent,
-  EventSubChannelTimeoutModerationEvent,
   EventSubChannelUnbanEvent,
 } from "@twurple/eventsub-base";
 import { user } from "../DiscordBot/interfaces";
 import { readFile } from "fs/promises";
+import { config } from "dotenv";
+import { resolve } from "path";
+import DiscordBot from "../DiscordBot/DiscordBot";
 
+// Load environment variables
+config({ path: resolve(__dirname, "../../.env") });
+
+// Validate environment variables
+const validateEnv = () => {
+  const required = ["clientID", "clientSecret"];
+  const missing = required.filter((key) => !process.env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}\n` +
+        "Make sure you have a .env file in the root directory or environment variables set on your VPS."
+    );
+  }
+};
+
+validateEnv();
 // Configuration
 const CONFIG = {
-  clientId: process.env.clientId as string,
-  clientSecret: process.env.clientSecret as string,
+  clientId: process.env.clientID as string, // Changed from env.clientId
+  clientSecret: process.env.clientSecret as string, // Changed from env.clientSecret
   userId: 106904180,
   channel: "#mimi_py",
 };
 
 // Service initialization
 const authProvider = new RefreshingAuthProvider({
-  clientId: CONFIG.clientId,
-  clientSecret: CONFIG.clientSecret,
+  clientId: CONFIG.clientId, // Changed to use CONFIG
+  clientSecret: CONFIG.clientSecret, // Changed to use CONFIG
 });
 
 const chatClient = new ChatClient({
@@ -62,7 +80,7 @@ async function logMessage(users: user[]): Promise<void> {
           ).profilePictureUrl,
       }))
   );
-  await LogAsUser(formattedUsers);
+  await DiscordBot.logAsUser(formattedUsers);
 }
 
 async function logChatMessage(
@@ -222,6 +240,7 @@ async function getFollowers() {
         .catch(() => ({ followers: [], unfollowedUsers: [] })),
       ctx.channels.getChannelFollowers(CONFIG.userId, undefined, {
         after: cursor,
+        limit: 100,
       }),
     ]);
 
@@ -239,12 +258,14 @@ async function getFollowers() {
       createdAt: f.followDate,
     }));
     cursor = firstBatch.cursor || "";
+    let i = 0;
 
     while (cursor) {
+      i++;
       const page = await ctx.channels.getChannelFollowers(
         CONFIG.userId,
         undefined,
-        { after: cursor }
+        { after: cursor, limit: 100 }
       );
       allFollowers.push(
         ...page.data.map((f) => ({
@@ -256,12 +277,11 @@ async function getFollowers() {
       cursor = page.cursor || "";
     }
 
-    const oldIds = new Set(oldFollowers.map((f) => f.userId));
     const newIds = new Set(allFollowers.map((f) => f.userId));
     const unfollowed = oldFollowers.filter((f) => !newIds.has(f.userId));
 
     if (unfollowed.length) {
-      await eventHandlers.onUnfollow(
+      eventHandlers.onUnfollow(
         unfollowed.map((u) => ({
           user: u.user,
           userId: u.userId,
@@ -281,7 +301,7 @@ async function getFollowers() {
       })),
       followers: allFollowers,
     };
-
+    console.log("Followers fetched successfully!");
     await fs.writeFile(
       "./followers.json",
       JSON.stringify(followers, null, 4),
@@ -291,7 +311,33 @@ async function getFollowers() {
     console.error("Failed to get followers:", error);
   }
 }
+async function raidChannel(channel: string): Promise<boolean | string> {
+  try {
+    const raidChannel = await apiClient.users.getUserByName(channel);
+    if (!raidChannel) return "Raid channel not found";
 
+    await apiClient.raids.startRaid(CONFIG.userId, raidChannel.id);
+    return true; // Raid started successfully
+  } catch (error) {
+    return false;
+  }
+}
+async function unraidChannel(): Promise<boolean> {
+  try {
+    await apiClient.raids.cancelRaid(CONFIG.userId);
+    return true; // Unraid started successfully
+  } catch (error) {
+    return false;
+  }
+}
+async function clearChat(): Promise<boolean> {
+  try {
+    await apiClient.moderation.deleteChatMessages(CONFIG.userId);
+    return true; // Chat cleared successfully
+  } catch (error) {
+    return false;
+  }
+}
 // Initialize services
 async function initializeServices(): Promise<void> {
   const listener = new EventSubWsListener({ apiClient });
@@ -304,6 +350,14 @@ async function initializeServices(): Promise<void> {
     eventHandlers.onChannelRedemptionAdd(data)
   );
   listener.onChannelUnban(CONFIG.userId, (data) => eventHandlers.onUnban(data));
+
+  listener.onStreamOnline(CONFIG.userId, async (data) =>
+    DiscordBot.setStreamActive(true)
+  );
+
+  listener.onStreamOffline(CONFIG.userId, async (data) =>
+    DiscordBot.setStreamActive(false)
+  );
 
   // Set up chat event listeners
   Object.entries(eventHandlers).forEach(([event, handler]) => {
@@ -347,4 +401,29 @@ async function refreshTokens(): Promise<void> {
 // Start application
 refreshTokens().catch(console.error);
 
-export { chatClient, apiClient };
+class TwitchClient {
+  public static readonly chatClient = chatClient;
+  public static readonly apiClient = apiClient;
+  public static readonly raidChannel = raidChannel;
+  public static readonly unraidChannel = unraidChannel;
+  public static readonly clearChat = clearChat;
+
+  /**
+   * Sends a message to a specified Twitch channel as a specified user.
+   * @param {string} channel - The Twitch channel to send the message to.
+   * @param {string} userId - The user ID to send the message as.
+   * @param {string} message - The message to send.
+   * @returns {Promise<void>} - A promise that resolves when the message is sent.
+   */
+  static async sendMessage(
+    channel: string,
+    userId: string,
+    message: string
+  ): Promise<void> {
+    return this.apiClient.asUser(userId, async () => {
+      await this.chatClient.say(channel, message);
+    });
+  }
+}
+
+export default TwitchClient;
