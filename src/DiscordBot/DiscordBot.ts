@@ -132,7 +132,6 @@ client.on("messageCreate", async (message: Message) => {
 
   if (message.author.id == "297656504842977291") {
     TwitchClient.sendMessage("#mimi_py", "106904180", message.content);
-    message.delete();
   }
 });
 
