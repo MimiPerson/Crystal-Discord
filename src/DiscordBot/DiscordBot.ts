@@ -14,11 +14,7 @@ import {
 } from "discord.js";
 import config from "../config";
 import { streamer, user } from "./interfaces";
-import {
-  formatMessageWithEmojis,
-  getOrCreateWebhook,
-  sendWebhookMessage,
-} from "./Helpers/helpers";
+import { formatMessageWithEmojis, sendWebhookMessage } from "./Helpers/helpers";
 import TwitchClient, { initializeClients } from "../Twitch/TwitchWebsocket";
 import { promises as fs } from "fs";
 import { channel } from "diagnostics_channel";
@@ -38,11 +34,10 @@ export const client = new Client({
 // Add this function to cache webhooks
 const webhookCache = new Map<string, Webhook>();
 
-async function getOrCreateWebhookWithRetry(
+async function getOrCreateWebhook(
   channel: TextChannel,
   name: string,
-  avatar: string,
-  retries = 1
+  avatar: string
 ): Promise<Webhook | null> {
   const cacheKey = `${channel.guildId}-${channel.id}`;
 
@@ -51,29 +46,26 @@ async function getOrCreateWebhookWithRetry(
     return webhookCache.get(cacheKey)!;
   }
 
-  for (let i = 0; i < retries; i++) {
-    try {
-      // Find existing webhook
-      const webhooks = await channel.fetchWebhooks();
-      let webhook = webhooks.find((wh) => wh.name === name);
+  try {
+    // Find existing webhook
+    const webhooks = await channel.fetchWebhooks();
+    let webhook = webhooks.find((wh) => wh.name === name);
 
-      if (!webhook) {
-        // Create new webhook if none exists
-        webhook = await channel.createWebhook({
-          name: name,
-          avatar: avatar,
-          reason: "Created for Crystal Socket logging",
-        });
-      }
-
-      // Cache the webhook
-      webhookCache.set(cacheKey, webhook);
-      return webhook;
-    } catch (error) {
-      if (i === retries - 1) return null;
-      // Wait before retry
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (!webhook) {
+      // Create new webhook if none exists
+      webhook = await channel.createWebhook({
+        name: name,
+        avatar: avatar,
+        reason: "Created for Crystal Socket logging",
+      });
     }
+
+    // Cache the webhook
+    webhookCache.set(cacheKey, webhook);
+    return webhook;
+  } catch (error) {
+    // Wait before retry
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
   return null;
@@ -483,7 +475,7 @@ async function logAsUser(
           discordGuild
         );
 
-        const webhook = await getOrCreateWebhookWithRetry(
+        const webhook = await getOrCreateWebhook(
           channel,
           "Crystal Socket",
           "https://i.imgur.com/nrhRy0b.png"
