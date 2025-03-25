@@ -1,10 +1,10 @@
 import {
   ActivityType,
-  Channel,
+  ApplicationCommandDataResolvable,
+  CacheType,
   Client,
+  CommandInteraction,
   GatewayIntentBits,
-  Guild,
-  GuildBasedChannel,
   Interaction,
   Message,
   Options,
@@ -20,14 +20,11 @@ import {
   sendWebhookMessage,
 } from "./Helpers/helpers";
 import TwitchClient, { initializeClients } from "../Twitch/TwitchWebsocket";
-import { get } from "http";
-import { promises } from "fs";
+import { promises as fs } from "fs";
 import { channel } from "diagnostics_channel";
 
 // Constants
 const BOT_TOKEN = config.token;
-const CHANNEL_ID = "1352682099085414470";
-const GUILD_ID = "1173586671451770880";
 
 // Initialize Discord client
 export const client = new Client({
@@ -38,132 +35,429 @@ export const client = new Client({
   ],
 });
 
-// Event handlers
-client.once("ready", async () => {});
+// Add this function to cache webhooks
+const webhookCache = new Map<string, Webhook>();
 
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-});
+async function getOrCreateWebhookWithRetry(
+  channel: TextChannel,
+  name: string,
+  avatar: string,
+  retries = 1
+): Promise<Webhook | null> {
+  const cacheKey = `${channel.guildId}-${channel.id}`;
 
-// Bot login and activity setup
+  // Check cache first
+  if (webhookCache.has(cacheKey)) {
+    return webhookCache.get(cacheKey)!;
+  }
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      // Find existing webhook
+      const webhooks = await channel.fetchWebhooks();
+      let webhook = webhooks.find((wh) => wh.name === name);
+
+      if (!webhook) {
+        // Create new webhook if none exists
+        webhook = await channel.createWebhook({
+          name: name,
+          avatar: avatar,
+          reason: "Created for Crystal Socket logging",
+        });
+      }
+
+      // Cache the webhook
+      webhookCache.set(cacheKey, webhook);
+      return webhook;
+    } catch (error) {
+      if (i === retries - 1) return null;
+      // Wait before retry
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  return null;
+}
+
+// Bot login and setup
 client
   .login(BOT_TOKEN)
-  .then(() => {
-    const guild = client.guilds.cache.get(GUILD_ID);
-    if (guild) {
-      guild.commands.create({
-        name: "addstreamer",
-        description: "Monitor target stream",
-        defaultMemberPermissions: "Administrator",
-        options: [
-          {
-            name: "streamer",
-            description: "Streamer to monitor",
-            type: 3, // String type
-            required: true,
-          },
-          {
-            name: "channel",
-            description: "Channel to log to",
-            type: 7, // Channel type
-            required: true,
-          },
-        ],
-      });
-    }
-
-    client.user?.setActivity({
-      name: "Watching My creator",
-      type: ActivityType.Streaming,
-      url: "https://www.twitch.tv/mimi_py",
-    });
+  .then(async () => {
+    await registerCommands();
+    setActivity();
   })
   .catch((err) => {
     console.error("Failed to login:", err);
   });
 
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isCommand()) return;
+client.addListener("guildCreate", async (guild) => {
+  const MAX_RETRIES = 5;
+  const RETRY_DELAY = 5000; // 5 seconds
+  let retryCount = 0;
 
-  const { commandName, options } = interaction;
+  const rerun = async () => {
+    try {
+      await registerCommands();
 
-  switch (commandName) {
-    case "addstreamer":
-      const streamerName = options.get("streamer", true).value as string;
-      const channelId = (
-        options.get("channel", true).channel as TextBasedChannel
-      ).id;
-      const guildId = interaction.guildId!;
-      const channelsData = JSON.parse(
-        await promises.readFile("./channels.json", "utf-8")
-      );
-      let streamerFound = false;
-      for (const streamer of channelsData) {
-        if (streamer.channel == `#${streamerName}`) {
-          streamer.Guilds.push({
-            guildId: guildId,
-            channelId: channelId,
+      // Wait for commands to be cached
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const commands = await guild.commands.fetch();
+
+      if (commands.size === 0 && retryCount < MAX_RETRIES) {
+        retryCount++;
+
+        setTimeout(rerun, RETRY_DELAY);
+        return;
+      }
+    } catch (error) {
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        setTimeout(rerun, RETRY_DELAY);
+      }
+    }
+  };
+
+  await rerun();
+  setActivity();
+});
+
+async function getStreamerChoices(guildId: string) {
+  const channelsData: streamer[] = JSON.parse(
+    await fs.readFile("./channels.json", "utf-8")
+  );
+
+  const streamerList = channelsData
+    .filter((streamer) =>
+      streamer.Guilds.some((guild) => guild.guildId === guildId)
+    )
+    .map((streamer) => streamer.channel);
+  const choices = await streamerList.map((streamer) => ({
+    name: streamer.replace("#", ""),
+    value: streamer,
+  }));
+  return choices;
+}
+// Register slash commands
+async function registerCommands(): Promise<void> {
+  const updatePromises = Array.from(client.guilds.cache.values()).map(
+    async (guild) => {
+      if (!guild) return;
+      try {
+        const streamerNames = await getStreamerChoices(guild.id);
+        const commands: ApplicationCommandDataResolvable[] = [
+          {
+            name: "addstreamer",
+            description: "Monitor target stream",
+            defaultMemberPermissions: "Administrator",
+            options: [
+              {
+                name: "streamer",
+                description: "Streamer to monitor",
+                type: 3, // String type
+                required: true,
+              },
+              {
+                name: "channel",
+                description: "Channel to log to",
+                type: 7, // Channel type
+                required: true,
+                channel_types: [0], // Text channels only
+              },
+            ],
+          },
+
+          {
+            name: "streamers",
+            description: "List all monitored streamers",
+            defaultMemberPermissions: "Administrator",
+          },
+        ];
+        // Add remove streamer command if there are any streamers
+        if (streamerNames.length > 0) {
+          commands.push({
+            name: "removestreamer",
+            description: "Stop monitoring target stream in channel",
+            defaultMemberPermissions: "Administrator",
+
+            options: [
+              {
+                name: "streamer",
+                description: "Streamer to stop monitoring",
+                type: 3,
+                required: true,
+                autocomplete: true,
+              },
+              {
+                name: "channel",
+                description: "Channel to stop logging to",
+                type: 3,
+                required: true,
+                autocomplete: true,
+              },
+            ],
           });
-          streamerFound = true;
-          break;
         }
-      }
-      if (!streamerFound) {
-        channelsData.push({
-          channel: `#${streamerName}`,
-          Guilds: [
+
+        //if home guild
+        if (guild.id === "1173586671451770880") {
+          commands.push(
+            // raid command
             {
-              guildId: guildId,
-              channelId: channelId,
+              name: "raid",
+              description: "Raid the channel",
+              defaultMemberPermissions: "Administrator",
+              type: 1, // Slash command
+
+              options: [
+                {
+                  name: "channel",
+                  description: "Channel to raid",
+                  type: 3, // String
+                  required: true,
+                },
+              ],
             },
-          ],
-        });
+            // unraid command
+            {
+              name: "unraid",
+              description: "Stop the raid",
+              defaultMemberPermissions: "Administrator",
+              type: 1, // Slash command
+            },
+            // clearchat command
+            {
+              name: "clearchat",
+              description: "Clear the chat",
+              defaultMemberPermissions: "Administrator",
+              type: 1, // Slash command
+
+              options: [
+                {
+                  name: "cleartwitch",
+                  description: "Clear Twitch",
+                  type: 3,
+                  required: true,
+                  choices: [
+                    {
+                      name: "Yes",
+                      value: "y",
+                    },
+                    {
+                      name: "No",
+                      value: "n",
+                    },
+                  ],
+                },
+              ],
+            }
+          );
+        }
+
+        // Use set method to handle command updates in one API call
+
+        await guild.commands.set(commands);
+      } catch (error) {
+        console.log("Failed to register commands:", error);
       }
+    }
+  );
 
-      await promises.writeFile(
-        "./channels.json",
-        JSON.stringify(channelsData, null, 4),
-        "utf-8"
-      );
-      initializeClients();
+  // Wait for all command updates to complete
+  await Promise.all(updatePromises);
+  return;
+}
 
-      interaction.reply({
-        content: `Added ${streamerName} to the list of monitored streamers.`,
-        flags: 64,
-      });
+// Set bot activity
+function setActivity() {
+  client.user?.setActivity({
+    name: "Watching My creator",
+    type: ActivityType.Streaming,
+    url: "https://www.twitch.tv/mimi_py",
+  });
+}
+
+// Command handler
+client.on("interactionCreate", async (interaction) => {
+  if (interaction.isAutocomplete()) {
+    if (interaction.commandName === "removestreamer") {
+      const focusedValue = interaction.options.getFocused();
+      const streamerOption = interaction.options.get("streamer");
+      const channelOption = interaction.options.get("channel");
+      if (streamerOption?.focused) {
+        const streamerNames = await getStreamerChoices(interaction.guildId!);
+
+        const filtered = streamerNames.filter((choice) =>
+          choice.name.toLowerCase().startsWith(focusedValue.toLowerCase())
+        );
+        await interaction.respond(filtered);
+      }
+      if (channelOption?.focused) {
+        const channelsData: streamer[] = JSON.parse(
+          await fs.readFile("./channels.json", "utf-8")
+        );
+        const channelList = channelsData
+          .filter((streamer) =>
+            streamer.Guilds.some(
+              (guild) => guild.guildId === interaction.guildId
+            )
+          )
+          .flatMap((streamer) =>
+            streamer.Guilds.map(
+              (guild) =>
+                interaction.guild?.channels.cache.get(guild.channelId)?.name
+            ).filter((name): name is string => name !== undefined)
+          );
+        const filtered = channelList.filter((choice) =>
+          choice?.startsWith(focusedValue.toLowerCase())
+        );
+        await interaction.respond(
+          filtered.map((choice) => ({ name: choice, value: choice }))
+        );
+      }
+    }
+  }
+  if (interaction.isCommand()) {
+    const { commandName, options } = interaction;
+
+    switch (commandName) {
+      case "addstreamer":
+        await handleAddStreamer(interaction, options);
+        break;
+      case "removestreamer":
+        await handleRemoveStreamer(interaction, options);
+        break;
+      case "streamers":
+        await handleListStreamers(interaction);
+        break;
+    }
+  }
+});
+
+// Command handlers
+async function handleAddStreamer(interaction: any, options: any) {
+  const streamerName = options.get("streamer", true).value as string;
+  const channelId = (options.get("channel", true).channel as TextBasedChannel)
+    .id;
+  const guildId = interaction.guildId!;
+
+  const channelsData = JSON.parse(
+    await fs.readFile("./channels.json", "utf-8")
+  );
+
+  let streamerFound = false;
+  for (const streamer of channelsData) {
+    if (streamer.channel === `#${streamerName}`) {
+      streamer.Guilds.push({ guildId, channelId });
+      streamerFound = true;
       break;
+    }
   }
-});
 
-client.on("messageCreate", async (message: Message) => {
-  if (
-    message.author.bot ||
-    message.channelId != "1352682099085414470" ||
-    message.webhookId
-  )
-    return;
-
-  if (message.author.id == "297656504842977291") {
-    TwitchClient.sendMessage("#mimi_py", "106904180", message.content);
+  if (!streamerFound) {
+    channelsData.push({
+      channel: `#${streamerName}`,
+      Guilds: [{ guildId, channelId }],
+    });
   }
-});
+
+  await fs.writeFile(
+    "./channels.json",
+    JSON.stringify(channelsData, null, 4),
+    "utf-8"
+  );
+
+  registerCommands();
+  initializeClients();
+
+  interaction.reply({
+    content: `Added ${streamerName} to the list of monitored streamers.`,
+    flags: 64,
+  });
+}
+
+async function handleRemoveStreamer(
+  interaction: CommandInteraction<CacheType>,
+  options: any
+) {
+  const streamerToRemove = options.get("streamer", true).value as string;
+  const channel = await interaction.guild?.channels.cache.find(
+    (c) => c.name === (options.get("channel", true).value as string)
+  );
+  const channelToRemoveId = channel?.id;
+
+  let removed = false;
+
+  const channelsData: streamer[] = JSON.parse(
+    await fs.readFile("./channels.json", "utf-8")
+  );
+  for (const streamer of channelsData) {
+    if (streamer.channel.toLowerCase() === streamerToRemove.toLowerCase()) {
+      const originalLength = streamer.Guilds.length;
+      streamer.Guilds = streamer.Guilds.filter(
+        (guild) => guild.channelId !== channelToRemoveId
+      );
+      removed = streamer.Guilds.length < originalLength;
+    }
+  }
+
+  // Remove streamers with no guilds left
+  const filteredChannelsData = channelsData.filter(
+    (streamer) => streamer.Guilds.length > 0
+  );
+
+  await fs.writeFile(
+    "./channels.json",
+    JSON.stringify(filteredChannelsData, null, 4),
+    "utf-8"
+  );
+  registerCommands();
+
+  initializeClients();
+
+  const channelName = channel?.name.toString() || "Unknown Channel";
+  interaction.reply({
+    content: `${
+      removed ? "Successfully removed" : "Failed to remove"
+    } ${streamerToRemove} from logging to ${channelName}.`,
+    flags: 64,
+  });
+}
+
+async function handleListStreamers(interaction: CommandInteraction<CacheType>) {
+  const channelsData: streamer[] = JSON.parse(
+    await fs.readFile("./channels.json", "utf-8")
+  );
+
+  const streamerList = channelsData
+    .filter((streamer) =>
+      streamer.Guilds.some((guild) => guild.guildId === interaction.guildId)
+    )
+    .map((streamer) => streamer.channel);
+
+  const response =
+    streamerList.length > 0
+      ? `Currently monitored streamers:\n${streamerList.join(", ")}`
+      : "No streamers are currently monitored.";
+
+  interaction.reply({
+    content: response,
+    flags: 64,
+  });
+}
 
 /**
  * Logs messages as specified users to specified stream channels.
  *
- * @param users - An array of user objects containing message, user, and profilePictureUrl.
- * @param streamChannel - A string or an array of strings representing the stream channels.
- * @returns A promise that resolves when all messages have been logged.
- *
- * The function reads channel data from a JSON file, iterates over the provided users and stream channels,
- * and sends formatted messages to the appropriate Discord channels using webhooks.
+ * @param users - Array of user objects containing message, user, and profilePictureUrl
+ * @param streamChannel - Stream channel(s) to log to
  */
 async function logAsUser(
   users: user[],
   streamChannel: string[] | string
 ): Promise<void> {
   const channelsData = JSON.parse(
-    await promises.readFile("./channels.json", "utf-8")
+    await fs.readFile("./channels.json", "utf-8")
   ) as streamer[];
 
   const streamChannels = Array.isArray(streamChannel)
@@ -188,48 +482,38 @@ async function logAsUser(
           user.message,
           discordGuild
         );
-        const webhook = await getOrCreateWebhook(
+
+        const webhook = await getOrCreateWebhookWithRetry(
           channel,
           "Crystal Socket",
           "https://i.imgur.com/nrhRy0b.png"
         );
-        await sendWebhookMessage(
-          webhook,
-          formattedMessage,
-          user.user,
-          user.profilePictureUrl!
-        );
+
+        if (!webhook) {
+          continue;
+        }
+
+        try {
+          await sendWebhookMessage(
+            webhook,
+            formattedMessage,
+            user.user,
+            user.profilePictureUrl ?? "https://i.imgur.com/nrhRy0b.png"
+          );
+        } catch (error) {
+          // Remove from cache if token is invalid
+          webhookCache.delete(`${channel.guildId}-${channel.id}`);
+        }
       }
     }
   }
 }
 
-async function setStreamActive(live: boolean): Promise<void> {
-  const guild = await client.guilds.fetch(GUILD_ID);
-  const channel = (await guild.channels.fetch(CHANNEL_ID)) as TextChannel;
-  channel
-    .edit({
-      name: live ? "🔴Stream Logs" : "🔵Stream Logs",
-    })
-    .then(() => {
-      console.log("Channel name updated successfully.");
-    })
-    .catch((error) => {
-      console.error("Error updating channel name:", error);
-    });
-}
-
 /**
- * Singleton class for the Discord bot
- * @class DiscordBot
- * @description This class provides a singleton instance of the Discord bot
- *
+ * Discord bot singleton class
  */
-
 class DiscordBot {
   private static instance: DiscordBot;
-  public static readonly setStreamActive = setStreamActive;
-
   public static readonly logAsUser = logAsUser;
 
   private constructor() {}
