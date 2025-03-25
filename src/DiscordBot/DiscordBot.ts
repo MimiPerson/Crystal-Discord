@@ -34,6 +34,40 @@ export const client = new Client({
 // Add this function to cache webhooks
 const webhookCache = new Map<string, Webhook>();
 
+async function cleanupDuplicateWebhooks(
+  channel: TextChannel,
+  name: string
+): Promise<void> {
+  try {
+    const webhooks = await channel.fetchWebhooks();
+    const matchingWebhooks = webhooks.filter((wh) => wh.name === name);
+
+    if (matchingWebhooks.size > 1) {
+      console.log(
+        `Found ${matchingWebhooks.size} duplicate webhooks in ${channel.name}. Cleaning up...`
+      );
+      // Keep the oldest webhook and delete the rest
+      const sortedWebhooks = Array.from(matchingWebhooks.values()).sort(
+        (a, b) => (a.createdTimestamp || 0) - (b.createdTimestamp || 0)
+      );
+
+      const [keepWebhook, ...duplicates] = sortedWebhooks;
+      await Promise.all(
+        duplicates.map((wh) =>
+          wh
+            .delete("Removing duplicate webhook")
+            .catch((err) => console.error(`Failed to delete webhook: ${err}`))
+        )
+      );
+
+      // Update cache with the kept webhook
+      webhookCache.set(`${channel.guildId}-${channel.id}`, keepWebhook);
+    }
+  } catch (error) {
+    console.error("Error cleaning up webhooks:", error);
+  }
+}
+
 async function getOrCreateWebhook(
   channel: TextChannel,
   name: string,
@@ -47,7 +81,10 @@ async function getOrCreateWebhook(
   }
 
   try {
-    // Find existing webhook
+    // Clean up any duplicate webhooks first
+    await cleanupDuplicateWebhooks(channel, name);
+
+    // Find existing webhooks
     const webhooks = await channel.fetchWebhooks();
     let webhook = webhooks.find((wh) => wh.name === name);
 
@@ -64,11 +101,11 @@ async function getOrCreateWebhook(
     webhookCache.set(cacheKey, webhook);
     return webhook;
   } catch (error) {
-    // Wait before retry
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.error("Webhook error:", error);
+    // Remove from cache if there was an error
+    webhookCache.delete(cacheKey);
+    return null;
   }
-
-  return null;
 }
 
 // Bot login and setup
@@ -456,6 +493,8 @@ async function logAsUser(
     ? streamChannel
     : [streamChannel];
 
+  const messagePromises: Promise<any>[] = [];
+
   for (const user of users) {
     for (const channelName of streamChannels) {
       const channelDetails = channelsData.find(
@@ -464,7 +503,14 @@ async function logAsUser(
 
       if (!channelDetails) continue;
 
+      // Process each guild channel only once
+      const processedChannels = new Set<string>();
+
       for (const guildInfo of channelDetails.Guilds) {
+        const channelKey = `${guildInfo.guildId}-${guildInfo.channelId}`;
+        if (processedChannels.has(channelKey)) continue;
+        processedChannels.add(channelKey);
+
         const discordGuild = client.guilds.cache.get(guildInfo.guildId);
         const channel = discordGuild?.channels.cache.get(guildInfo.channelId);
 
@@ -475,30 +521,34 @@ async function logAsUser(
           discordGuild
         );
 
-        const webhook = await getOrCreateWebhook(
-          channel,
-          "Crystal Socket",
-          "https://i.imgur.com/nrhRy0b.png"
-        );
-
-        if (!webhook) {
-          continue;
-        }
-
-        try {
-          await sendWebhookMessage(
-            webhook,
-            formattedMessage,
-            user.user,
-            user.profilePictureUrl ?? "https://i.imgur.com/nrhRy0b.png"
+        const messagePromise = (async () => {
+          const webhook = await getOrCreateWebhook(
+            channel,
+            "Crystal Socket",
+            "https://i.imgur.com/nrhRy0b.png"
           );
-        } catch (error) {
-          // Remove from cache if token is invalid
-          webhookCache.delete(`${channel.guildId}-${channel.id}`);
-        }
+
+          if (!webhook) return;
+
+          try {
+            await sendWebhookMessage(
+              webhook,
+              formattedMessage,
+              user.user,
+              user.profilePictureUrl ?? "https://i.imgur.com/nrhRy0b.png"
+            );
+          } catch (error) {
+            webhookCache.delete(channelKey);
+          }
+        })();
+
+        messagePromises.push(messagePromise);
       }
     }
   }
+
+  // Wait for all messages to be sent
+  await Promise.all(messagePromises);
 }
 
 /**
