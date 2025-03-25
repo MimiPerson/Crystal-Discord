@@ -4,4 +4,12 @@ interface user {
   profilePictureUrl: string | null;
 }
 
-export type { user };
+interface streamer {
+  channel: string;
+  Guilds: guild[];
+}
+interface guild {
+  guildId: string;
+  channelId: string;
+}
+export type { user, streamer, guild };

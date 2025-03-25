@@ -1,22 +1,28 @@
 import {
   ActivityType,
+  Channel,
   Client,
   GatewayIntentBits,
+  Guild,
+  GuildBasedChannel,
   Interaction,
   Message,
   Options,
+  TextBasedChannel,
   TextChannel,
   Webhook,
 } from "discord.js";
 import config from "../config";
-import { user } from "./interfaces";
+import { streamer, user } from "./interfaces";
 import {
   formatMessageWithEmojis,
   getOrCreateWebhook,
   sendWebhookMessage,
 } from "./Helpers/helpers";
-import TwitchClient from "../Twitch/TwitchWebsocket";
+import TwitchClient, { initializeClients } from "../Twitch/TwitchWebsocket";
 import { get } from "http";
+import { promises } from "fs";
+import { channel } from "diagnostics_channel";
 
 // Constants
 const BOT_TOKEN = config.token;
@@ -43,57 +49,29 @@ client.on("messageCreate", async (message) => {
 client
   .login(BOT_TOKEN)
   .then(() => {
-    client.guilds.cache.get(GUILD_ID)?.commands.set([
-      // raid command
-      {
-        name: "raid",
-        description: "Raid the channel",
+    const guild = client.guilds.cache.get(GUILD_ID);
+    if (guild) {
+      guild.commands.create({
+        name: "addstreamer",
+        description: "Monitor target stream",
         defaultMemberPermissions: "Administrator",
-        type: 1, // Slash command
-
         options: [
+          {
+            name: "streamer",
+            description: "Streamer to monitor",
+            type: 3, // String type
+            required: true,
+          },
           {
             name: "channel",
-            description: "Channel to raid",
-            type: 3, // String
+            description: "Channel to log to",
+            type: 7, // Channel type
             required: true,
           },
         ],
-      },
-      // unraid command
-      {
-        name: "unraid",
-        description: "Stop the raid",
-        defaultMemberPermissions: "Administrator",
-        type: 1, // Slash command
-      },
-      // clearchat command
-      {
-        name: "clearchat",
-        description: "Clear the chat",
-        defaultMemberPermissions: "Administrator",
-        type: 1, // Slash command
+      });
+    }
 
-        options: [
-          {
-            name: "cleartwitch",
-            description: "Clear Twitch",
-            type: 3,
-            required: true,
-            choices: [
-              {
-                name: "Yes",
-                value: "y",
-              },
-              {
-                name: "No",
-                value: "n",
-              },
-            ],
-          },
-        ],
-      },
-    ]);
     client.user?.setActivity({
       name: "Watching My creator",
       type: ActivityType.Streaming,
@@ -110,14 +88,49 @@ client.on("interactionCreate", async (interaction) => {
   const { commandName, options } = interaction;
 
   switch (commandName) {
-    case "raid":
-      handleRaid(interaction, options);
-      break;
-    case "unraid":
-      handleUnraid(interaction);
-      break;
-    case "clearchat":
-      handleClearChat(interaction, options);
+    case "addstreamer":
+      const streamerName = options.get("streamer", true).value as string;
+      const channelId = (
+        options.get("channel", true).channel as TextBasedChannel
+      ).id;
+      const guildId = interaction.guildId!;
+      const channelsData = JSON.parse(
+        await promises.readFile("./channels.json", "utf-8")
+      );
+      let streamerFound = false;
+      for (const streamer of channelsData) {
+        if (streamer.channel == `#${streamerName}`) {
+          streamer.Guilds.push({
+            guildId: guildId,
+            channelId: channelId,
+          });
+          streamerFound = true;
+          break;
+        }
+      }
+      if (!streamerFound) {
+        channelsData.push({
+          channel: `#${streamerName}`,
+          Guilds: [
+            {
+              guildId: guildId,
+              channelId: channelId,
+            },
+          ],
+        });
+      }
+
+      await promises.writeFile(
+        "./channels.json",
+        JSON.stringify(channelsData, null, 4),
+        "utf-8"
+      );
+      initializeClients();
+
+      interaction.reply({
+        content: `Added ${streamerName} to the list of monitored streamers.`,
+        flags: 64,
+      });
       break;
   }
 });
@@ -135,92 +148,59 @@ client.on("messageCreate", async (message: Message) => {
   }
 });
 
-async function handleRaid(interaction: Interaction, options: any) {
-  if (!interaction.isCommand()) return;
-
-  await TwitchClient.raidChannel(options.data[0].value as string).then(
-    async (response) => {
-      if (typeof response === "string") {
-        return await interaction.reply({
-          content: response,
-          flags: 64,
-        });
-      }
-      if (response) {
-        return interaction.reply({
-          content: `Raid started on ${options.data[0].value}`,
-          flags: 64,
-        });
-      }
-      return await interaction.reply({
-        content: `Raid failed on ${options.data[0].value}`,
-        flags: 64,
-      });
-    }
-  );
-}
-async function handleUnraid(interaction: Interaction) {
-  if (!interaction.isCommand()) return;
-
-  await TwitchClient.unraidChannel().then(async (response) => {
-    if (response) {
-      return interaction.reply({
-        content: `Raid has been stopped`,
-        flags: 64,
-      });
-    }
-    return await interaction.reply({
-      content: `failed to stop raid`,
-      flags: 64,
-    });
-  });
-}
-async function handleClearChat(interaction: Interaction, options: any) {
-  if (!interaction.isCommand()) return;
-  const guild = await client.guilds.fetch(GUILD_ID);
-  const channel = (await guild.channels.fetch(CHANNEL_ID)) as TextChannel;
-
-  channel.bulkDelete(25, true).catch((err) => {
-    interaction.reply({
-      content: `Failed to delete discord messages`,
-      flags: 64,
-    });
-  });
-  const wipeTwitchChat = (options.data[0].value as string) === "y";
-  if (wipeTwitchChat) {
-    await TwitchClient.clearChat().catch((err) => {
-      interaction.reply({
-        content: `Failed to delete twitch messages`,
-        flags: 64,
-      });
-    });
-  }
-  await interaction.reply({
-    content: `Chat has been cleared`,
-    flags: 64,
-  });
-}
-
 /**
- * Sends a message as a webhook with custom user data
- * @param userData User data containing message and profile information
+ * Logs messages as specified users to specified stream channels.
+ *
+ * @param users - An array of user objects containing message, user, and profilePictureUrl.
+ * @param streamChannel - A string or an array of strings representing the stream channels.
+ * @returns A promise that resolves when all messages have been logged.
+ *
+ * The function reads channel data from a JSON file, iterates over the provided users and stream channels,
+ * and sends formatted messages to the appropriate Discord channels using webhooks.
  */
-async function logAsUser(users: user[]): Promise<void> {
+async function logAsUser(
+  users: user[],
+  streamChannel: string[] | string
+): Promise<void> {
+  const channelsData = JSON.parse(
+    await promises.readFile("./channels.json", "utf-8")
+  ) as streamer[];
+
+  const streamChannels = Array.isArray(streamChannel)
+    ? streamChannel
+    : [streamChannel];
+
   for (const user of users) {
-    const guild = await client.guilds.fetch(GUILD_ID);
-    const channel = (await guild.channels.fetch(CHANNEL_ID)) as TextChannel;
-    const formattedMessage = formatMessageWithEmojis(user.message, guild);
-    const webhook = await getOrCreateWebhook(
-      channel,
-      "Crystal Socket",
-      "https://i.imgur.com/nrhRy0b.png"
-    );
-    await sendWebhookMessage(
-      webhook,
-      formattedMessage,
-      user.user,
-      user.profilePictureUrl!
-    );
+    for (const channelName of streamChannels) {
+      const channelDetails = channelsData.find(
+        (streamer) => streamer.channel.replace("#", "") === channelName
+      );
+
+      if (!channelDetails) continue;
+
+      for (const guildInfo of channelDetails.Guilds) {
+        const discordGuild = client.guilds.cache.get(guildInfo.guildId);
+        const channel = discordGuild?.channels.cache.get(guildInfo.channelId);
+
+        if (!discordGuild || !(channel instanceof TextChannel)) continue;
+
+        const formattedMessage = formatMessageWithEmojis(
+          user.message,
+          discordGuild
+        );
+        const webhook = await getOrCreateWebhook(
+          channel,
+          "Crystal Socket",
+          "https://i.imgur.com/nrhRy0b.png"
+        );
+        await sendWebhookMessage(
+          webhook,
+          formattedMessage,
+          user.user,
+          user.profilePictureUrl!
+        );
+      }
+    }
   }
 }
 
@@ -250,6 +230,8 @@ class DiscordBot {
   private static instance: DiscordBot;
   public static readonly setStreamActive = setStreamActive;
 
+  public static readonly logAsUser = logAsUser;
+
   private constructor() {}
 
   public static getInstance(): DiscordBot {
@@ -257,10 +239,6 @@ class DiscordBot {
       DiscordBot.instance = new DiscordBot();
     }
     return DiscordBot.instance;
-  }
-
-  public static async logAsUser(users: user[]): Promise<void> {
-    await logAsUser(users);
   }
 }
 
