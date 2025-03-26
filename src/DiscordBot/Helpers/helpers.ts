@@ -1,10 +1,28 @@
-import { TextChannel, Webhook } from "discord.js";
+import {
+  ActivityType,
+  CacheType,
+  CommandInteraction,
+  TextChannel,
+  Webhook,
+} from "discord.js";
+import { streamer } from "../interfaces";
+import { promises } from "fs";
+import DiscordBot from "../DiscordBot";
 
 // Helper functions
 function formatMessageWithEmojis(message: string, guild: any) {
   return message.replace(/:(\w+):/g, (match, emojiName) => {
     const emoji = guild.emojis.cache.find((e: any) => e.name === emojiName);
     return emoji ? emoji.toString() : match;
+  });
+}
+
+// Set bot activity
+function setActivity() {
+  DiscordBot.getClient().user?.setActivity({
+    name: "Watching My creator",
+    type: ActivityType.Streaming,
+    url: "https://www.twitch.tv/mimi_py",
   });
 }
 
@@ -22,13 +40,17 @@ async function getOrCreateWebhook(
     }))
   );
 }
-
+let messageCache: [string, Date] = ["", new Date(0)];
 async function sendWebhookMessage(
   webhook: Webhook | null,
   content: string,
   username: string,
   avatarUrl: string
 ) {
+  if (messageCache[0] === content && messageCache[1] > new Date(Date.now() - 5))
+    return;
+  messageCache = [content, new Date()];
+  if (username.toLowerCase() === "mimi_py") username = "Mimi_Py   👑";
   await webhook?.send({
     content,
     username,
@@ -37,4 +59,32 @@ async function sendWebhookMessage(
   });
 }
 
-export { formatMessageWithEmojis, getOrCreateWebhook, sendWebhookMessage };
+async function handleListStreamers(interaction: CommandInteraction<CacheType>) {
+  const channelsData: streamer[] = JSON.parse(
+    await promises.readFile("./channels.json", "utf-8")
+  );
+
+  const streamerList = channelsData
+    .filter((streamer) =>
+      streamer.Guilds.some((guild) => guild.guildId === interaction.guildId)
+    )
+    .map((streamer) => streamer.channel);
+
+  const response =
+    streamerList.length > 0
+      ? `Currently monitored streamers:\n${streamerList.join(", ")}`
+      : "No streamers are currently monitored.";
+
+  interaction.reply({
+    content: response,
+    flags: 64,
+  });
+}
+
+export {
+  formatMessageWithEmojis,
+  getOrCreateWebhook,
+  sendWebhookMessage,
+  handleListStreamers,
+  setActivity,
+};
