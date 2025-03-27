@@ -46,7 +46,11 @@ client
     console.error("Failed to login:", err);
   });
 client.on("messageCreate", async (message) => {
-  if (message.reference && (await message.fetchReference()).pinned)
+  if (
+    message.reference &&
+    (await message.fetchReference()).pinned &&
+    (await message.fetchReference()).author.bot
+  )
     message.delete();
 });
 
