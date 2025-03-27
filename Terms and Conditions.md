@@ -42,8 +42,6 @@ We collect and store:
 - Channel configurations
 - Emote data
 
-> **Note**: We do not collect or store personal information beyond publicly available data.
-
 ## Limitations
 The service is provided with the following limitations:
 - Dependency on Discord and Twitch API availability
