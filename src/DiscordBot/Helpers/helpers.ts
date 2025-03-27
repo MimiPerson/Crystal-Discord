@@ -48,13 +48,13 @@ async function sendWebhookMessage(
   content: string,
   username: string,
   avatarUrl: string,
-  streamer: boolean
+  permission: boolean
 ) {
   if (messageCache[0] === content && messageCache[1] > new Date(Date.now() - 5))
     return;
   messageCache = [content, new Date()];
 
-  if (content.toLowerCase().startsWith("!addnote") && streamer) {
+  if (content.toLowerCase().startsWith("!addnote") && permission) {
     const embed = new EmbedBuilder()
 
       .setDescription(`${content.replace("!addnote", "")} \n`)

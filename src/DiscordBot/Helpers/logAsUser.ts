@@ -152,7 +152,7 @@ async function sendMessageViaWebhook(
       parsedMessage,
       userName,
       user.profilePictureUrl ?? "https://i.imgur.com/nrhRy0b.png",
-      msg?.userInfo.isBroadcaster || false
+      msg?.userInfo.isBroadcaster || msg?.userInfo.isMod || false
     );
   } catch (error) {
     if (channelKey) DiscordBot.webhookCache.delete(channelKey);
