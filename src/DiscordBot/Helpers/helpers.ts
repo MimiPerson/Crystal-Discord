@@ -2,6 +2,7 @@ import {
   ActivityType,
   CacheType,
   CommandInteraction,
+  EmbedBuilder,
   TextChannel,
   Webhook,
 } from "discord.js";
@@ -40,16 +41,39 @@ async function getOrCreateWebhook(
     }))
   );
 }
+const noteList = ["mimi_py", "alyxolotl"];
 let messageCache: [string, Date] = ["", new Date(0)];
 async function sendWebhookMessage(
   webhook: Webhook | null,
   content: string,
   username: string,
-  avatarUrl: string
+  avatarUrl: string,
+  streamer: boolean
 ) {
   if (messageCache[0] === content && messageCache[1] > new Date(Date.now() - 5))
     return;
   messageCache = [content, new Date()];
+
+  if (content.toLowerCase().startsWith("!addnote") && streamer) {
+    const embed = new EmbedBuilder()
+
+      .setDescription(`${content.replace("!addnote", "")} \n`)
+
+      .setColor("#00b0f4");
+
+    return webhook
+      ?.send({
+        content: "Note added:",
+        embeds: [embed],
+        username: "📝",
+        avatarURL: avatarUrl,
+        allowedMentions: { parse: [] },
+      })
+      .then((message) => {
+        message.pin("Note pinned by bot");
+      });
+  }
+
   await webhook?.send({
     content,
     username,

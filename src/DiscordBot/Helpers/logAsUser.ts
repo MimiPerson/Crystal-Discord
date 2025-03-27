@@ -151,7 +151,8 @@ async function sendMessageViaWebhook(
       webhook,
       parsedMessage,
       userName,
-      user.profilePictureUrl ?? "https://i.imgur.com/nrhRy0b.png"
+      user.profilePictureUrl ?? "https://i.imgur.com/nrhRy0b.png",
+      msg?.userInfo.isBroadcaster || false
     );
   } catch (error) {
     if (channelKey) DiscordBot.webhookCache.delete(channelKey);

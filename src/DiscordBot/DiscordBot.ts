@@ -45,6 +45,10 @@ client
   .catch((err) => {
     console.error("Failed to login:", err);
   });
+client.on("messageCreate", async (message) => {
+  if (message.reference && (await message.fetchReference()).pinned)
+    message.delete();
+});
 
 client.addListener("guildCreate", async (guild) => {
   const MAX_RETRIES = 5;

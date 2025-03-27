@@ -2,9 +2,12 @@ import { promises } from "fs";
 import { TextBasedChannel } from "discord.js";
 import Helper from "../helperClass";
 import { initializeClients } from "../../Twitch/TwitchWebsocket";
+import { streamer } from "../interfaces";
 
 async function handleAddStreamer(interaction: any, options: any) {
-  const streamerName = options.get("streamer", true).value as string;
+  const streamerName = (
+    options.get("streamer", true).value as string
+  ).toLowerCase();
   const channelId = (options.get("channel", true).channel as TextBasedChannel)
     .id;
 
@@ -22,11 +25,11 @@ async function handleAddStreamer(interaction: any, options: any) {
   }
   const guildId = interaction.guildId!;
 
-  const channelsData = JSON.parse(
+  const channelsData: streamer[] = JSON.parse(
     await promises.readFile("./channels.json", "utf-8")
   );
 
-  const streamerData = {
+  const streamerData: streamer = {
     channel: `#${streamerName}`,
     Guilds: [
       {
@@ -40,7 +43,18 @@ async function handleAddStreamer(interaction: any, options: any) {
   let streamerFound = false;
   for (const streamer of channelsData) {
     if (streamer.channel === `#${streamerName}`) {
-      streamer.Guilds.push(streamerData);
+      if (streamer.Guilds.some((g) => g.channelId === channelId)) {
+        return interaction.reply({
+          content: `This channel is already registered for ${streamerName}.`,
+          flags: 64,
+        });
+      }
+      streamer.Guilds.push({
+        guildId,
+        channelId,
+        updateLive,
+        channelNames: [liveName, offlineName],
+      });
       streamerFound = true;
       break;
     }
