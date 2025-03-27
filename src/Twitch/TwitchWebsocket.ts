@@ -95,7 +95,8 @@ export async function initializeClients() {
 // Helper function to log messages to Discord
 export async function logMessage(
   channel: string,
-  users: user[]
+  users: user[],
+  msg?: ChatMessage
 ): Promise<void> {
   const formattedUsers: user[] = await Promise.all(
     users
@@ -110,7 +111,7 @@ export async function logMessage(
           ).profilePictureUrl,
       }))
   );
-  await DiscordBot.logAsUser(formattedUsers, channel);
+  await DiscordBot.logAsUser(formattedUsers, channel, msg);
 }
 
 // Helper function to log chat messages
@@ -122,9 +123,11 @@ export async function logChatMessage(
 ): Promise<void> {
   const pfp = (await Helper.getUserData(user)).profilePictureUrl;
   const userName = msg?.userInfo.displayName || user;
-  await logMessage(channel, [
-    { message, user: userName, profilePictureUrl: pfp },
-  ]);
+  await logMessage(
+    channel,
+    [{ message, user: userName, profilePictureUrl: pfp }],
+    msg
+  );
 }
 
 // Token management and initialization

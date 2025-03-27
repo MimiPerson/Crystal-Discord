@@ -1,4 +1,9 @@
-import { ActivityType, Client, GatewayIntentBits, Webhook } from "discord.js";
+import {
+  ApplicationEmoji,
+  Client,
+  GatewayIntentBits,
+  Webhook,
+} from "discord.js";
 import config from "../config";
 import { streamer } from "./interfaces";
 import { promises } from "fs";
@@ -24,6 +29,7 @@ client
   .login(BOT_TOKEN)
   .then(async () => {
     await Helper.registerCommands();
+    Helper.registerCommands();
     Helper.setActivity();
     const guilds: { name?: string; members?: number; TotalGuilds?: number }[] =
       await client.guilds.cache.map((guild) => ({
