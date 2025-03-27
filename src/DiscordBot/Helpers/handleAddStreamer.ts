@@ -58,6 +58,7 @@ async function handleAddStreamer(interaction: any, options: any) {
 
   Helper.registerCommands();
   initializeClients();
+  if (!interaction) return;
 
   interaction.reply({
     content: `Added ${streamerName} to the list of monitored streamers.`,

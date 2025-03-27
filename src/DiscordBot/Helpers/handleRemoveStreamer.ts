@@ -47,6 +47,7 @@ async function handleRemoveStreamer(
   initializeClients();
 
   const channelName = channel?.name.toString() || "Unknown Channel";
+  if (!interaction) return;
   interaction.reply({
     content: `${
       removed ? "Successfully removed" : "Failed to remove"

@@ -50,7 +50,6 @@ async function sendWebhookMessage(
   if (messageCache[0] === content && messageCache[1] > new Date(Date.now() - 5))
     return;
   messageCache = [content, new Date()];
-  if (username.toLowerCase() === "mimi_py") username = "Mimi_Py   👑";
   await webhook?.send({
     content,
     username,

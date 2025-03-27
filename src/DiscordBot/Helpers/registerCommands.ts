@@ -13,6 +13,19 @@ async function registerCommands(): Promise<void> {
         const streamerNames = await getStreamerChoices(guild.id);
         const commands: ApplicationCommandDataResolvable[] = [
           {
+            name: "say",
+            description: "Make the bot say something",
+            type: 1, // Slash command
+            options: [
+              {
+                name: "message",
+                description: "Message to send",
+                type: 3, // String type
+                required: true,
+              },
+            ],
+          },
+          {
             name: "addstreamer",
             description: "Monitor target stream",
             defaultMemberPermissions: "Administrator",
