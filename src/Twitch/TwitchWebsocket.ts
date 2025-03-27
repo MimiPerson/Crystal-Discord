@@ -153,7 +153,6 @@ async function refreshTokens(): Promise<void> {
 
     await authProvider.refreshAccessTokenForUser(CONFIG.userId);
     await initializeClients();
-
     listener.onChannelRedemptionAdd(CONFIG.userId, (data) =>
       Helper.eventHandlers.onChannelRedemptionAdd(data)
     );
