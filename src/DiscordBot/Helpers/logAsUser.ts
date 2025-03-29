@@ -264,11 +264,7 @@ async function parseMessage(
 }
 
 /**
- * Replaces emotes in a message with Discord emojis.
- *
- * @param message - The message containing emotes.
- * @param emoteMap - Array of emote mappings.
- * @returns The message with emotes replaced by emojis.
+ * Replaces emotes in message with Discord emojis
  */
 async function replaceEmotesWithEmojis(
   message: string,
@@ -284,9 +280,7 @@ async function replaceEmotesWithEmojis(
 
     const emojis = await client.application?.emojis.fetch();
     const emojiString = emojis
-      ?.find(
-        async (emoji) => emoji.name === (await formatEmoteName(emote.emoteName))
-      )
+      ?.find((emoji) => emoji.name === formatEmoteName(emote.emoteName))
       ?.toString();
 
     if (emojiString) {
