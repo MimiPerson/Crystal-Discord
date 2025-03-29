@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "bun run src/index.ts"
   },
   "dependencies": {
     "@twurple/api": "^7.2.1",

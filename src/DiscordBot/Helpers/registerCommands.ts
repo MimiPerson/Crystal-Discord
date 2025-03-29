@@ -1,16 +1,28 @@
 import { promises } from "fs";
 import DiscordBot from "../DiscordBot";
 import { streamer } from "../interfaces";
-import { ApplicationCommandDataResolvable } from "discord.js";
+import {
+  ApplicationCommandDataResolvable,
+  SlashCommandBuilder,
+} from "discord.js";
 
-// Register slash commands
+/**
+ * Registers slash commands for the Discord bot.
+ * This function dynamically updates commands based on the guild and its specific requirements.
+ */
 async function registerCommands(): Promise<void> {
   const client = DiscordBot.getClient();
+
+  // Iterate through all guilds the bot is a part of
   const updatePromises = Array.from(client.guilds.cache.values()).map(
     async (guild) => {
       if (!guild) return;
+
       try {
+        // Fetch streamer choices for the current guild
         const streamerNames = await getStreamerChoices(guild.id);
+
+        // Define the base set of commands
         const commands: ApplicationCommandDataResolvable[] = [
           {
             name: "addstreamer",
@@ -39,43 +51,42 @@ async function registerCommands(): Promise<void> {
               {
                 name: "livename",
                 description: "Channel name to use when live",
-                type: 3,
+                type: 3, // String type
                 required: false,
               },
               {
                 name: "offlinename",
                 description: "Channel name to use when offline",
-                type: 3,
+                type: 3, // String type
                 required: false,
               },
             ],
           },
-
           {
             name: "streamers",
             description: "List all monitored streamers",
             defaultMemberPermissions: "Administrator",
           },
         ];
-        // Add remove streamer command if there are any streamers
+
+        // Add the "removestreamer" command if there are any streamers
         if (streamerNames.length > 0) {
           commands.push({
             name: "removestreamer",
             description: "Stop monitoring target stream in channel",
             defaultMemberPermissions: "Administrator",
-
             options: [
               {
                 name: "streamer",
                 description: "Streamer to stop monitoring",
-                type: 3,
+                type: 3, // String type
                 required: true,
                 autocomplete: true,
               },
               {
                 name: "channel",
                 description: "Channel to stop logging to",
-                type: 3,
+                type: 3, // String type
                 required: true,
                 autocomplete: true,
               },
@@ -83,54 +94,43 @@ async function registerCommands(): Promise<void> {
           });
         }
 
-        //if home guild
+        // Add additional commands for the home guild
         if (guild.id === "1173586671451770880") {
           commands.push(
-            // raid command
             {
               name: "raid",
               description: "Raid the channel",
               defaultMemberPermissions: "Administrator",
               type: 1, // Slash command
-
               options: [
                 {
                   name: "channel",
                   description: "Channel to raid",
-                  type: 3, // String
+                  type: 3, // String type
                   required: true,
                 },
               ],
             },
-            // unraid command
             {
               name: "unraid",
               description: "Stop the raid",
               defaultMemberPermissions: "Administrator",
               type: 1, // Slash command
             },
-            // clearchat command
             {
               name: "clearchat",
               description: "Clear the chat",
               defaultMemberPermissions: "Administrator",
               type: 1, // Slash command
-
               options: [
                 {
                   name: "cleartwitch",
                   description: "Clear Twitch",
-                  type: 3,
+                  type: 3, // String type
                   required: true,
                   choices: [
-                    {
-                      name: "Yes",
-                      value: "y",
-                    },
-                    {
-                      name: "No",
-                      value: "n",
-                    },
+                    { name: "Yes", value: "y" },
+                    { name: "No", value: "n" },
                   ],
                 },
               ],
@@ -138,34 +138,42 @@ async function registerCommands(): Promise<void> {
           );
         }
 
-        // Use set method to handle command updates in one API call
-
+        // Update the guild's commands in one API call
         await guild.commands.set(commands);
       } catch (error) {
-        console.log("Failed to register commands:", error);
+        console.error("Failed to register commands:", error);
       }
     }
   );
 
   // Wait for all command updates to complete
   await Promise.all(updatePromises);
-  return;
 }
 
+/**
+ * Fetches a list of streamer choices for a specific guild.
+ * @param guildId - The ID of the guild to fetch streamer choices for.
+ * @returns An array of streamer choices formatted for Discord commands.
+ */
 async function getStreamerChoices(guildId: string) {
+  // Read and parse the channels data from the JSON file
   const channelsData: streamer[] = JSON.parse(
     await promises.readFile("./channels.json", "utf-8")
   );
 
+  // Filter streamers associated with the given guild ID
   const streamerList = channelsData
     .filter((streamer) =>
       streamer.Guilds.some((guild) => guild.guildId === guildId)
     )
     .map((streamer) => streamer.channel);
-  const choices = await streamerList.map((streamer) => ({
-    name: streamer.replace("#", ""),
+
+  // Map the streamer list to Discord command choices
+  const choices = streamerList.map((streamer) => ({
+    name: streamer.replace("#", ""), // Remove "#" from streamer names
     value: streamer,
   }));
+
   return choices;
 }
 
