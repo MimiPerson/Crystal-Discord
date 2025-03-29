@@ -1,5 +1,5 @@
 import { promises } from "fs";
-import { TextBasedChannel } from "discord.js";
+import { TextBasedChannel, PermissionsBitField } from "discord.js";
 import Helper from "../helperClass";
 import { initializeClients } from "../../Twitch/TwitchWebsocket";
 import { streamer } from "../interfaces";

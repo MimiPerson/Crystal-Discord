@@ -210,6 +210,8 @@ async function parseMessage(
   formattedMessage: string,
   msg?: ChatMessage
 ): Promise<string> {
+  const bot = channel.guild.members.me;
+
   const emoteOffset =
     msg?.emoteOffsets instanceof Map
       ? Array.from(msg.emoteOffsets.entries())
@@ -224,21 +226,28 @@ async function parseMessage(
     .filter((w) => w !== false);
 
   if (mentions) {
-    try {
-      for (const mention of mentions) {
-        const discordId = (await channel.guild.members.list()).find(
-          (member) => member.user.username === mention
-        )?.id;
+    if (
+      bot &&
+      channel
+        .permissionsFor(bot)
+        .has(["ViewChannel", "ManageChannels", "ManageMessages"])
+    ) {
+      try {
+        for (const mention of mentions) {
+          const discordId = (await channel.guild.members.list()).find(
+            (member) => member.user.username === mention
+          )?.id;
 
-        if (discordId) {
-          formattedMessage = formattedMessage.replace(
-            `!d @${mention}`,
-            `<@${discordId}>`
-          );
+          if (discordId) {
+            formattedMessage = formattedMessage.replace(
+              `!d @${mention}`,
+              `<@${discordId}>`
+            );
+          }
         }
+      } catch (e) {
+        console.error("Error during addMentions", e);
       }
-    } catch (e) {
-      console.error("Error during addMentions", e);
     }
   }
 
