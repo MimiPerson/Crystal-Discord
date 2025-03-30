@@ -5,17 +5,18 @@ import {
   Webhook,
 } from "discord.js";
 import config from "../config";
-import { streamer } from "./interfaces";
-import { promises } from "fs";
+
 import { writeFile } from "fs/promises";
 import Helper from "./helperClass";
+import { MongoDB } from "../MongoDB/MongoDB";
+import { Streamer } from "../MongoDB/models/streamer.model";
 
 // Constants
 const BOT_TOKEN = config.token; // Bot token from configuration
 const webhookCache = new Map<string, Webhook>(); // Cache for webhooks
 
 // Initialize Discord client with necessary intents
-export const client = new Client({
+const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
@@ -32,12 +33,11 @@ client
     Helper.setActivity();
 
     // Collect guild information and save it to a JSON file
-    const guilds: { name?: string; members?: number; TotalGuilds?: number }[] =
-      await client.guilds.cache.map((guild) => ({
-        name: guild.name,
-        members: guild.memberCount,
-      }));
-    guilds.unshift({ TotalGuilds: client.guilds.cache.size });
+
+    const guilds = client.guilds.cache.map((guild) => ({
+      name: guild.name,
+      members: guild.memberCount,
+    }));
 
     await writeFile("./guilds.json", JSON.stringify(guilds, null, 4), "utf-8");
   })
@@ -110,21 +110,22 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (channelOption?.focused) {
-        const channelsData: streamer[] = JSON.parse(
-          await promises.readFile("./channels.json", "utf-8")
-        );
+        await MongoDB.getInstance();
+        const channelsData = await Streamer.find();
 
         const channelList = channelsData
           .filter((streamer) =>
-            streamer.Guilds.some(
+            streamer.guilds.some(
               (guild) => guild.guildId === interaction.guildId
             )
           )
           .flatMap((streamer) =>
-            streamer.Guilds.map(
-              (guild) =>
-                interaction.guild?.channels.cache.get(guild.channelId)?.name
-            ).filter((name): name is string => name !== undefined)
+            streamer.guilds
+              .map(
+                (guild) =>
+                  interaction.guild?.channels.cache.get(guild.channelId)?.name
+              )
+              .filter((name): name is string => name !== undefined)
           );
 
         const filtered = channelList.filter((choice) =>

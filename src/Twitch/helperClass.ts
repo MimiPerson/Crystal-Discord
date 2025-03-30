@@ -3,7 +3,7 @@ import { clearChat, raidChannel, unraidChannel } from "./Helpers/commands";
 import eventHandlers from "./Helpers/eventHandlers";
 
 import getStreamersOnline from "./Helpers/getStreamersOnline";
-import { getChannels, logChatMessage, logMessage } from "./TwitchWebsocket";
+import { logChatMessage, logMessage } from "./TwitchWebsocket";
 
 /**
  * Helper class providing utility methods for Twitch stream management and interactions.
@@ -25,7 +25,6 @@ import { getChannels, logChatMessage, logMessage } from "./TwitchWebsocket";
 class Helper {
   // Stream information
   public static getStreamersOnline = getStreamersOnline;
-  public static getChannels = getChannels;
 
   // Channel actions
   public static raidChannel = raidChannel;

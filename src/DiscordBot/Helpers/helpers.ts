@@ -9,6 +9,7 @@ import {
 import { streamer } from "../interfaces";
 import { promises } from "fs";
 import DiscordBot from "../DiscordBot";
+import { Streamer } from "../../MongoDB/models/streamer.model";
 
 /**
  * Replaces emoji placeholders (e.g., :emojiName:) in a message with actual emojis from the guild.
@@ -99,16 +100,9 @@ async function handleListStreamers(
   interaction: CommandInteraction<CacheType>
 ): Promise<void> {
   // Read and parse the list of streamers from the channels.json file.
-  const channelsData: streamer[] = JSON.parse(
-    await promises.readFile("./channels.json", "utf-8")
-  );
-
-  // Filter streamers monitored in the current guild.
-  const streamerList = channelsData
-    .filter((streamer) =>
-      streamer.Guilds.some((guild) => guild.guildId === interaction.guildId)
-    )
-    .map((streamer) => streamer.channel);
+  const streamerList = await Streamer.find({
+    guilds: { $elemMatch: { guildId: interaction.guildId } },
+  });
 
   // Generate a response based on the list of streamers.
   const response =

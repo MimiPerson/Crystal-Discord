@@ -5,6 +5,7 @@ import {
   ApplicationCommandDataResolvable,
   SlashCommandBuilder,
 } from "discord.js";
+import { Streamer } from "../../MongoDB/models/streamer.model";
 
 /**
  * Registers slash commands for the Discord bot.
@@ -157,21 +158,14 @@ async function registerCommands(): Promise<void> {
  */
 async function getStreamerChoices(guildId: string) {
   // Read and parse the channels data from the JSON file
-  const channelsData: streamer[] = JSON.parse(
-    await promises.readFile("./channels.json", "utf-8")
-  );
-
-  // Filter streamers associated with the given guild ID
-  const streamerList = channelsData
-    .filter((streamer) =>
-      streamer.Guilds.some((guild) => guild.guildId === guildId)
-    )
-    .map((streamer) => streamer.channel);
+  const channelsData = await Streamer.find({
+    guilds: { $elemMatch: { guildId } },
+  });
 
   // Map the streamer list to Discord command choices
-  const choices = streamerList.map((streamer) => ({
-    name: streamer.replace("#", ""), // Remove "#" from streamer names
-    value: streamer,
+  const choices = channelsData.map((streamer) => ({
+    name: streamer.name, // Remove "#" from streamer names
+    value: streamer.name,
   }));
 
   return choices;

@@ -1,11 +1,12 @@
-import Helper from "../helperClass";
+import { error } from "console";
+import { Streamer } from "../../MongoDB/models/streamer.model";
 import TwitchClient from "../TwitchWebsocket";
 
 async function getStreamersOnline(): Promise<string[] | undefined> {
-  const apiClient = await TwitchClient.getApiClient();
+  const apiClient = TwitchClient.getApiClient();
   if (!apiClient) return;
-  const streamers = (await Helper.getChannels()).map((streamer) =>
-    streamer.slice(1)
+  const streamers = (await Streamer.find({}, { name: 1, _id: 0 })).map(
+    (streamer) => streamer.name
   );
 
   if (streamers.length === 0) return;

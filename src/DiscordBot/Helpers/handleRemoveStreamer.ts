@@ -3,56 +3,55 @@ import { streamer } from "../interfaces";
 import { promises } from "fs";
 import Helper from "../helperClass";
 import { initializeClients } from "../../Twitch/TwitchWebsocket";
+import { Streamer } from "../../MongoDB/models/streamer.model";
 
 async function handleRemoveStreamer(
   interaction: CommandInteraction<CacheType>,
   options: any
 ) {
-  const streamerToRemove = options.get("streamer", true).value as string;
-  const channel = await interaction.guild?.channels.cache.find(
+  const streamerToRemove = options
+    .get("streamer", true)
+    .value.toLowerCase() as string;
+  const channel = interaction.guild?.channels.cache.find(
     (c) => c.name === (options.get("channel", true).value as string)
   );
   const channelToRemoveId = channel?.id;
 
-  let removed = false;
-
-  const channelsData: streamer[] = JSON.parse(
-    await promises.readFile("./channels.json", "utf-8")
-  );
-  for (const streamer of channelsData) {
-    if (streamer.channel.toLowerCase() === streamerToRemove.toLowerCase()) {
-      const originalLength = streamer.Guilds.length;
-      streamer.Guilds = streamer.Guilds.filter(
-        (guild) => guild.channelId !== channelToRemoveId
-      );
-      if (streamer.Guilds.length === 0)
-        channelsData.splice(channelsData.indexOf(streamer), 1);
-
-      removed = streamer.Guilds.length < originalLength;
-    }
+  if (!channelToRemoveId) {
+    return interaction.reply({
+      content: `Channel not found.`,
+      flags: 64,
+    });
   }
 
-  // Remove streamers with no guilds left
-  const filteredChannelsData = channelsData.filter(
-    (streamer) => streamer.Guilds.length > 0
-  );
+  const streamer = await Streamer.findOne({ name: streamerToRemove });
 
-  await promises.writeFile(
-    "./channels.json",
-    JSON.stringify(filteredChannelsData, null, 4),
-    "utf-8"
+  if (!streamer) {
+    return interaction.reply({
+      content: `Streamer ${streamerToRemove} not found.`,
+      flags: 64,
+    });
+  }
+
+  const guildIndex = streamer.guilds.findIndex(
+    (guild) => guild.channelId === channelToRemoveId
   );
+  if (guildIndex !== -1) {
+    streamer.guilds.splice(guildIndex, 1);
+  }
+
+  if (streamer.guilds.length === 0) {
+    await streamer.deleteOne();
+  }
+  interaction.reply({
+    content: `Streamer ${streamerToRemove} removed successfully.`,
+    flags: 64,
+  });
+  streamer.updatedAt = new Date();
+  await streamer.save();
   Helper.registerCommands();
 
   initializeClients();
-
-  const channelName = channel?.name.toString() || "Unknown Channel";
-  if (!interaction) return;
-  interaction.reply({
-    content: `${
-      removed ? "Successfully removed" : "Failed to remove"
-    } ${streamerToRemove} from logging to ${channelName}.`,
-    flags: 64,
-  });
+  return;
 }
 export default handleRemoveStreamer;

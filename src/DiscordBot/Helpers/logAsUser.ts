@@ -1,7 +1,6 @@
-import { promises } from "fs";
-import { streamer, user } from "../interfaces";
+import { user } from "../interfaces";
 import DiscordBot from "../DiscordBot";
-import { TextChannel } from "discord.js";
+import { Client, TextChannel } from "discord.js";
 import {
   formatMessageWithEmojis,
   getOrCreateWebhook,
@@ -11,6 +10,7 @@ import { loadEmotes, parseMessageWithEmotes } from "./Emotes";
 import { ChatMessage } from "@twurple/chat";
 import getPronouns from "./pronouns";
 import Helper from "../helperClass";
+import { Streamer } from "../../MongoDB/models/streamer.model";
 
 /**
  * Logs messages as specified users to specified stream channels.
@@ -29,78 +29,44 @@ export async function logAsUser(
   const client = DiscordBot.getClient();
   if (!client) return;
 
-  // Load channels configuration
-  const channelsData = await loadChannelsData();
-
-  // Normalize stream channels to an array
-  const streamChannels = Array.isArray(streamChannel)
-    ? streamChannel
-    : [streamChannel];
-
   const messagePromises: Promise<any>[] = [];
 
   for (const user of users) {
-    for (const channelName of streamChannels) {
-      const channelDetails = findChannelDetails(channelsData, channelName);
-      if (!channelDetails) continue;
+    const channelDetails = await Streamer.findOne({ name: streamChannel });
 
-      // Process each guild channel only once
-      const processedChannels = new Set<string>();
+    if (!channelDetails) continue;
 
-      for (const guildInfo of channelDetails.Guilds) {
-        const channelKey = `${guildInfo.guildId}-${guildInfo.channelId}`;
-        if (processedChannels.has(channelKey)) continue;
-        processedChannels.add(channelKey);
+    // Process each guild channel only once
+    const processedChannels = new Set<string>();
 
-        const discordChannel = getDiscordChannel(client, guildInfo);
-        if (!discordChannel) continue;
+    for (const guildInfo of channelDetails.guilds) {
+      const channelKey = `${guildInfo.guildId}-${guildInfo.channelId}`;
+      if (processedChannels.has(channelKey)) continue;
+      processedChannels.add(channelKey);
 
-        const formattedMessage = formatMessageWithEmojis(
-          user.message,
-          discordChannel.guild
-        );
+      const discordChannel = getDiscordChannel(client, guildInfo);
+      if (!discordChannel) continue;
 
-        messagePromises.push(
-          sendMessageViaWebhook(
-            discordChannel,
-            user,
-            formattedMessage,
-            msg,
-            channelKey,
-            twitchEvent
-          )
-        );
-      }
+      const formattedMessage = formatMessageWithEmojis(
+        user.message,
+        discordChannel.guild
+      );
+
+      messagePromises.push(
+        sendMessageViaWebhook(
+          discordChannel,
+          user,
+          formattedMessage,
+          msg,
+          channelKey,
+          twitchEvent
+        )
+      );
     }
   }
 
   // Wait for all messages to be sent
   await Promise.all(messagePromises);
-}
-
-/**
- * Loads channels data from a JSON file.
- *
- * @returns Parsed channels data as an array of streamer objects.
- */
-async function loadChannelsData(): Promise<streamer[]> {
-  return JSON.parse(await promises.readFile("./channels.json", "utf-8"));
-}
-
-/**
- * Finds channel details from the loaded channels data.
- *
- * @param channelsData - Array of streamer objects.
- * @param channelName - Name of the channel to find.
- * @returns The matching streamer object or undefined if not found.
- */
-function findChannelDetails(
-  channelsData: streamer[],
-  channelName: string
-): streamer | undefined {
-  return channelsData.find(
-    (streamer) => streamer.channel.replace("#", "") === channelName
-  );
 }
 
 /**
@@ -111,7 +77,7 @@ function findChannelDetails(
  * @returns The TextChannel object or null if not found.
  */
 function getDiscordChannel(
-  client: any,
+  client: Client,
   guildInfo: { guildId: string; channelId: string }
 ): TextChannel | null {
   const discordGuild = client.guilds.cache.get(guildInfo.guildId);

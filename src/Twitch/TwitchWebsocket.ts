@@ -1,15 +1,16 @@
 // External Dependencies
-import { ApiClient, HelixUser } from "@twurple/api";
+import { ApiClient } from "@twurple/api";
 import { RefreshingAuthProvider } from "@twurple/auth";
 import { EventSubWsListener } from "@twurple/eventsub-ws";
 import { promises } from "fs";
 import { ChatClient, ChatMessage } from "@twurple/chat";
-import { readFile } from "fs/promises";
 
 // Internal Dependencies
-import { streamer, user } from "../DiscordBot/interfaces";
+import { user } from "../DiscordBot/interfaces";
 import DiscordBot from "../DiscordBot/DiscordBot";
 import Helper from "./helperClass";
+import { MongoDB } from "../MongoDB/MongoDB";
+import { Streamer } from "../MongoDB/models/streamer.model";
 
 // ===================================
 // Validate required environment variables
@@ -30,18 +31,6 @@ const validateEnv = () => {
 };
 
 validateEnv();
-
-// ===================================
-// Helper function to fetch channels from a JSON file
-/**
- * Reads the list of channels from a JSON file and returns them.
- * @returns {Promise<string[]>} - A promise that resolves to an array of channel names.
- */
-export async function getChannels(): Promise<string[]> {
-  const streamers: streamer[] =
-    JSON.parse(await readFile("./channels.json", "utf-8")) || [];
-  return streamers.map((streamer) => streamer.channel);
-}
 
 // ===================================
 // Configuration constants
@@ -82,6 +71,7 @@ export async function initializeClients() {
   apiClient = new ApiClient({ authProvider });
   listener = new EventSubWsListener({ apiClient });
   listener.start();
+  MongoDB.getInstance().connect();
 
   const liveChannels = await Helper.getStreamersOnline();
   if (liveChannels) {
@@ -89,8 +79,10 @@ export async function initializeClients() {
   }
 
   // Connect to chat channels
-  const channels = await getChannels();
-  if (channels.length === 0) return;
+  const channels = (await Streamer.find({}, { name: 1, _id: 0 })).map(
+    (streamer) => "#" + streamer.name
+  );
+  if (!channels) return;
 
   chatClient = new ChatClient({
     authProvider,
@@ -108,6 +100,14 @@ export async function initializeClients() {
   });
 }
 
+// const guildConfig = new Schema({
+//   guildId: { type: String, required: true },
+//   channelId: { type: String, required: true },
+//   channelNames: {
+//     live: { type: String, default: "" },
+//     offline: { type: String, default: "" },
+//   },
+// });
 // ===================================
 // Helper function to log messages to Discord
 /**
