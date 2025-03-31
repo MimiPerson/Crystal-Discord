@@ -43,12 +43,7 @@ async function registerCommands(): Promise<void> {
                 required: true,
                 channel_types: [0], // Text channels only
               },
-              {
-                name: "updatechannel",
-                description: "Update channel name when live",
-                type: 5, // Boolean type
-                required: false,
-              },
+
               {
                 name: "livename",
                 description: "Channel name to use when live",
