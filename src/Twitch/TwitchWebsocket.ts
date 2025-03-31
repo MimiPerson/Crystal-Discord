@@ -1,19 +1,23 @@
 // External Dependencies
-import { ApiClient, HelixUser } from "@twurple/api";
+import { ApiClient } from "@twurple/api";
 import { RefreshingAuthProvider } from "@twurple/auth";
 import { EventSubWsListener } from "@twurple/eventsub-ws";
 import { promises } from "fs";
 import { ChatClient, ChatMessage } from "@twurple/chat";
 
-import { readFile } from "fs/promises";
-
 // Internal Dependencies
-import { streamer, user } from "../DiscordBot/interfaces";
+import { user } from "../DiscordBot/interfaces";
 import DiscordBot from "../DiscordBot/DiscordBot";
 import Helper from "./helperClass";
+import { MongoDB } from "../MongoDB/MongoDB";
+import { Streamer } from "../MongoDB/models/streamer.model";
 
 // ===================================
 // Validate required environment variables
+/**
+ * Ensures that all required environment variables are set.
+ * Throws an error if any are missing.
+ */
 const validateEnv = () => {
   const required = ["clientID", "clientSecret"];
   const missing = required.filter((key) => !process.env[key]);
@@ -28,14 +32,7 @@ const validateEnv = () => {
 
 validateEnv();
 
-// Helper function to fetch channels from a JSON file
-export async function getChannels(): Promise<string[]> {
-  const streamers: streamer[] =
-    JSON.parse(await readFile("./channels.json", "utf-8")) || [];
-
-  return streamers.map((streamer) => streamer.channel);
-}
-
+// ===================================
 // Configuration constants
 const CONFIG = {
   clientId: process.env.clientID as string,
@@ -43,6 +40,8 @@ const CONFIG = {
   userId: 106904180, // Replace with your Twitch user ID
 };
 
+// ===================================
+// Periodic task to fetch online streamers
 setTimeout(async () => {
   const liveChannels = await Helper.getStreamersOnline();
   if (liveChannels) {
@@ -51,6 +50,8 @@ setTimeout(async () => {
     console.error("Failed to fetch online streamers.");
   }
 }, 120000); // 2 minutes
+
+// ===================================
 // Service initialization
 const authProvider = new RefreshingAuthProvider({
   clientId: CONFIG.clientId,
@@ -61,26 +62,33 @@ let chatClient: ChatClient | undefined;
 let apiClient: ApiClient;
 let listener: EventSubWsListener;
 
+// ===================================
 // Initialize Twitch clients and listeners
+/**
+ * Initializes the Twitch API client, chat client, and event listeners.
+ */
 export async function initializeClients() {
   apiClient = new ApiClient({ authProvider });
   listener = new EventSubWsListener({ apiClient });
   listener.start();
-  const liveChannels = await Helper.getStreamersOnline();
+  MongoDB.getInstance().connect();
 
+  const liveChannels = await Helper.getStreamersOnline();
   if (liveChannels) {
     DiscordBot.setStreamersOnline(liveChannels);
   }
 
   // Connect to chat channels
-  const channels = await getChannels();
-  chatClient = undefined;
-  if (channels.length === 0) return;
+  const channels = (await Streamer.find({}, { name: 1, _id: 0 })).map(
+    (streamer) => "#" + streamer.name
+  );
+  if (!channels) return;
 
   chatClient = new ChatClient({
     authProvider,
     channels,
   });
+
   if (!chatClient) return;
   chatClient.connect();
 
@@ -92,11 +100,28 @@ export async function initializeClients() {
   });
 }
 
+// const guildConfig = new Schema({
+//   guildId: { type: String, required: true },
+//   channelId: { type: String, required: true },
+//   channelNames: {
+//     live: { type: String, default: "" },
+//     offline: { type: String, default: "" },
+//   },
+// });
+// ===================================
 // Helper function to log messages to Discord
+/**
+ * Logs a message to Discord with user details.
+ * @param {string} channel - The channel to log the message to.
+ * @param {user[]} users - Array of user objects.
+ * @param {ChatMessage} [msg] - Optional chat message object.
+ * @param {string} [event] - Optional event name.
+ */
 export async function logMessage(
   channel: string,
   users: user[],
-  msg?: ChatMessage
+  msg?: ChatMessage,
+  event?: string
 ): Promise<void> {
   const formattedUsers: user[] = await Promise.all(
     users
@@ -111,10 +136,18 @@ export async function logMessage(
           ).profilePictureUrl,
       }))
   );
-  await DiscordBot.logAsUser(formattedUsers, channel, msg);
+  await DiscordBot.logAsUser(formattedUsers, channel, msg, event);
 }
 
+// ===================================
 // Helper function to log chat messages
+/**
+ * Logs a chat message to Discord.
+ * @param {string} channel - The channel where the message was sent.
+ * @param {string} user - The username of the sender.
+ * @param {string} message - The message content.
+ * @param {ChatMessage} [msg] - Optional chat message object.
+ */
 export async function logChatMessage(
   channel: string,
   user: string,
@@ -130,7 +163,11 @@ export async function logChatMessage(
   );
 }
 
+// ===================================
 // Token management and initialization
+/**
+ * Refreshes tokens and initializes the Twitch clients and listeners.
+ */
 async function refreshTokens(): Promise<void> {
   try {
     const tokenData = JSON.parse(
@@ -153,6 +190,8 @@ async function refreshTokens(): Promise<void> {
 
     await authProvider.refreshAccessTokenForUser(CONFIG.userId);
     await initializeClients();
+
+    // Register event listeners
     listener.onChannelRedemptionAdd(CONFIG.userId, (data) =>
       Helper.eventHandlers.onChannelRedemptionAdd(data)
     );
@@ -165,29 +204,14 @@ async function refreshTokens(): Promise<void> {
   }
 }
 
+// ===================================
 // Start application
 refreshTokens().catch(console.error);
 
+// ===================================
+// TwitchClient Class
 /**
  * The `TwitchClient` class provides static methods and properties to interact with Twitch's API and chat functionality.
- * It acts as a utility for sending messages, managing raids, clearing chat, and accessing helper functions.
- *
- * ## Static Properties:
- * - `CONFIG`: Configuration object for the Twitch client.
- * - `getChatClient`: A function that returns the chat client instance.
- * - `getApiClient`: A function that returns the API client instance.
- * - `raidChannel`: A helper function to initiate a raid on a specified channel.
- * - `unraidChannel`: A helper function to cancel an ongoing raid.
- * - `clearChat`: A helper function to clear the chat of a specified channel.
- * - `helper`: A reference to the `Helper` utility for additional Twitch-related operations.
- *
- * ## Static Methods:
- * - `sendMessage(channel: string, userId: string, message: string): Promise<void>`:
- *   Sends a message to a specified Twitch channel as a specified user.
- *   - `channel`: The Twitch channel to send the message to.
- *   - `userId`: The user ID to send the message as.
- *   - `message`: The message to send.
- *   - Returns: A promise that resolves when the message is successfully sent.
  */
 class TwitchClient {
   private static readonly apiClient = apiClient;

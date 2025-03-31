@@ -1,6 +1,8 @@
 import { initializeClients } from "../Twitch/TwitchWebsocket";
 import handleAddStreamer from "./Helpers/handleAddStreamer";
 import handleRemoveStreamer from "./Helpers/handleRemoveStreamer";
+import { handleTwitchCommands } from "./Helpers/handleTwitchCommands";
+import handleTwitchEvents from "./Helpers/handleTwitchEvents";
 import { handleListStreamers, setActivity } from "./Helpers/helpers";
 import { logAsUser } from "./Helpers/logAsUser";
 import {
@@ -17,31 +19,72 @@ import {
 /**
  * A utility class that provides static methods for managing streamers,
  * handling Discord bot commands, and performing various bot-related actions.
- *
- * Static Methods:
- * - `handleAddStreamer`: Handles the addition of a new streamer.
- * - `handleRemoveStreamer`: Handles the removal of an existing streamer.
- * - `handleListStreamers`: Retrieves and handles the list of all streamers.
- * - `handleRaid`: Initiates a raid action.
- * - `handleUnraid`: Cancels an ongoing raid.
- * - `handleClearChat`: Clears the chat in a Discord channel.
- * - `registerCommands`: Registers bot commands with Discord.
- * - `getStreamerChoices`: Retrieves a list of streamer choices for commands or actions.
- * - `logAsUser`: Logs actions or messages as a specific user.
- * - `setStreamersOnline`: Updates the status of streamers to online.
- * - `setActivity`: Sets the bot's activity status in Discord.
  */
 class Helper {
+  /**
+   * Handles the addition of a new streamer.
+   */
   public static handleAddStreamer = handleAddStreamer;
+
+  /**
+   * Handles the removal of an existing streamer.
+   */
   public static handleRemoveStreamer = handleRemoveStreamer;
+
+  /**
+   * Retrieves and handles the list of all streamers.
+   */
   public static handleListStreamers = handleListStreamers;
+
+  /**
+   * Initiates a raid action.
+   */
   public static handleRaid = handleRaid;
+
+  /**
+   * Cancels an ongoing raid.
+   */
   public static handleUnraid = handleUnraid;
+
+  /**
+   * Clears the chat in a Discord channel.
+   */
   public static handleClearChat = handleClearChat;
+
+  /**
+   * Registers bot commands with Discord.
+   */
   public static registerCommands = registerCommands;
+
+  /**
+   * Retrieves a list of streamer choices for commands or actions.
+   */
   public static getStreamerChoices = getStreamerChoices;
+
+  /**
+   * Logs actions or messages as a specific user.
+   */
   public static logAsUser = logAsUser;
+
+  /**
+   * Updates the status of streamers to online.
+   */
   public static setStreamersOnline = setStreamersOnline;
+
+  /**
+   * Sets the bot's activity status in Discord.
+   */
   public static setActivity = setActivity;
+
+  /**
+   * Handles Twitch-specific events.
+   */
+  public static handleTwitchEvents = handleTwitchEvents;
+
+  /**
+   * Handles Twitch-specific commands.
+   */
+  public static handleTwitchCommands = handleTwitchCommands;
 }
+
 export default Helper;

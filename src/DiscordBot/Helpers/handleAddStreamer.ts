@@ -1,10 +1,12 @@
-import { promises } from "fs";
-import { TextBasedChannel } from "discord.js";
+import { TextBasedChannel, PermissionsBitField } from "discord.js";
 import Helper from "../helperClass";
-import { initializeClients } from "../../Twitch/TwitchWebsocket";
+import TwitchClient, { initializeClients } from "../../Twitch/TwitchWebsocket";
+import { Streamer } from "../../MongoDB/models/streamer.model";
 
 async function handleAddStreamer(interaction: any, options: any) {
-  const streamerName = options.get("streamer", true).value as string;
+  const streamerName = (
+    options.get("streamer", true).value as string
+  ).toLowerCase();
   const channelId = (options.get("channel", true).channel as TextBasedChannel)
     .id;
 
@@ -14,47 +16,44 @@ async function handleAddStreamer(interaction: any, options: any) {
   const offlineName =
     (options.get("offlinename", false)?.value as string) || "";
 
-  if (updateLive && (!liveName || !offlineName)) {
+  if ((liveName || offlineName) && (!liveName || !offlineName)) {
     return interaction.reply({
       content: "Please provide both live and offline channel names.",
       flags: 64,
     });
   }
-  const guildId = interaction.guildId!;
-
-  const channelsData = JSON.parse(
-    await promises.readFile("./channels.json", "utf-8")
+  const interactionGuildId: string = interaction.guildId!;
+  const streamerFetch = await TwitchClient.getApiClient().users.getUserByName(
+    streamerName
   );
-
-  const streamerData = {
-    channel: `#${streamerName}`,
-    Guilds: [
-      {
-        guildId,
-        channelId,
-        updateLive,
-        channelNames: [liveName, offlineName],
-      },
-    ],
-  };
-  let streamerFound = false;
-  for (const streamer of channelsData) {
-    if (streamer.channel === `#${streamerName}`) {
-      streamer.Guilds.push(streamerData);
-      streamerFound = true;
-      break;
-    }
+  if (!streamerFetch) {
+    return interaction.reply({
+      content: `Streamer ${streamerName} not found.`,
+      flags: 64,
+    });
   }
 
-  if (!streamerFound) {
-    channelsData.push(streamerData);
-  }
+  const streamerData = await Streamer.findOne({ name: streamerName });
 
-  await promises.writeFile(
-    "./channels.json",
-    JSON.stringify(channelsData, null, 4),
-    "utf-8"
-  );
+  const streamer =
+    streamerData ||
+    new Streamer({
+      name: streamerName,
+      createdAt: new Date(),
+    });
+
+  streamer.twitchId = streamerFetch?.id;
+  streamer.guilds.push({
+    guildId: interactionGuildId,
+    channelId: channelId,
+    channelNames: {
+      live: liveName === "" ? "" : liveName,
+      offline: offlineName === "" ? "" : offlineName,
+    },
+  });
+  streamer.updatedAt = new Date();
+
+  await streamer.save();
 
   Helper.registerCommands();
   initializeClients();
