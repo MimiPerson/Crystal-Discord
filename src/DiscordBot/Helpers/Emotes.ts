@@ -9,10 +9,13 @@ import { formatEmoteName } from "./logAsUser";
  */
 export async function fetchEmotes(
   channelId?: string
-): Promise<Map<string, string>> {
+): Promise<Map<string, string> | null> {
   const sevenTvResponse = await fetch(
     `https://7tv.io/v3/users/twitch/${channelId || ""}`
   );
+  if (!sevenTvResponse.ok) {
+    return null;
+  }
   const sevenTvData = await sevenTvResponse.json();
   const sevenTvEmotes = sevenTvData.emote_set?.emotes || [];
 
@@ -40,7 +43,7 @@ export async function parseMessageWithEmotes(
   message: string,
   twitchEmotes: string,
   channelId?: string,
-  emoteMap?: Map<string, string>
+  emoteMap?: Map<string, string> | null
 ): Promise<{ emoteName: string; link: string }[]> {
   // Fetch 7TV emotes if not provided
   emoteMap = emoteMap || (await fetchEmotes(channelId));
