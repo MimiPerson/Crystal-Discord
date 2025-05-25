@@ -87,4 +87,29 @@ class Helper {
   public static handleTwitchCommands = handleTwitchCommands;
 }
 
+interface Metrics {
+  commandsExecuted: number;
+  webhookCalls: number;
+  errors: Record<string, number>;
+  responseTime: number[];
+}
+
+class MetricsCollector {
+  private static metrics: Metrics = {
+    commandsExecuted: 0,
+    webhookCalls: 0,
+    errors: {},
+    responseTime: []
+  };
+
+  static trackCommand(command: string, duration: number) {
+    this.metrics.commandsExecuted++;
+    this.metrics.responseTime.push(duration);
+  }
+
+  static getMetrics(): Metrics {
+    return this.metrics;
+  }
+}
+
 export default Helper;

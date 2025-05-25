@@ -93,8 +93,9 @@ export async function loadEmotes(
   emoteMap: { emoteName: string; link: string }[]
 ): Promise<{ emoteName: string; emoji: ApplicationEmoji }[]> {
   const client = DiscordBot.getClient();
+ 
   if (!client) return [];
-
+ 
   // Create a map of unique emotes to avoid duplicates
   const uniqueEmotes = new Map<string, { emoteName: string; link: string }>();
   emoteMap.forEach((emote) => {
@@ -102,8 +103,20 @@ export async function loadEmotes(
       uniqueEmotes.set(formatEmoteName(emote.emoteName), emote);
     }
   });
+ 
 
   const emojis = await client.application?.emojis.fetch();
+  
+
+if(emojis && emojis.size >= 1500 ) {
+  let i = 0;
+  for(const [key, emoji] of emojis.entries()) {
+    console.log(key, " ", emoji.name);
+    await emoji.delete();
+    i++;
+    if(i >= 50) break;
+  }
+}
 
   // Filter emotes that need to be created
   const emotesToCreate = Array.from(uniqueEmotes.values()).filter((emote) => {
@@ -112,7 +125,7 @@ export async function loadEmotes(
     );
     return !existingEmoji;
   });
-
+ 
   // Create new emojis
   const createdEmotes = await Promise.all(
     emotesToCreate.map(async (emote) => {
@@ -147,7 +160,6 @@ export async function loadEmotes(
       }
     })
   );
-
   // Combine existing and newly created emojis
   const allEmotes = Array.from(uniqueEmotes.values()).map((emote) => {
     const existingEmoji = emojis?.find(
@@ -159,7 +171,6 @@ export async function loadEmotes(
           (created) => created?.emoteName === formatEmoteName(emote.emoteName)
         );
   });
-
   // Filter out undefined results and return the final list
   return allEmotes.filter(
     (result): result is { emoteName: string; emoji: ApplicationEmoji } =>

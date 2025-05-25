@@ -2,6 +2,11 @@ import {
   ApplicationEmoji,
   Client,
   GatewayIntentBits,
+
+  GuildMember,
+
+  UserResolvable,
+
   Webhook,
 } from "discord.js";
 import config from "../config";
@@ -10,6 +15,8 @@ import { writeFile } from "fs/promises";
 import Helper from "./helperClass";
 import { MongoDB } from "../MongoDB/MongoDB";
 import { Streamer } from "../MongoDB/models/streamer.model";
+import { promises } from "fs";
+import handleStreamThreads from "./Helpers/handleStreamThreads";
 
 // Constants
 const BOT_TOKEN = config.token; // Bot token from configuration
@@ -21,6 +28,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildPresences,
   ],
 });
 
@@ -47,12 +55,19 @@ client
 
 // Automatically delete messages that reply to pinned bot messages
 client.on("messageCreate", async (message) => {
-  if (
-    message.reference &&
-    (await message.fetchReference()).pinned &&
-    (await message.fetchReference()).author.bot
-  ) {
-    message.delete();
+  try {
+    if (!message.reference) return;
+    
+    const referencedMessage = await message.fetchReference().catch(() => null);
+    if (!referencedMessage) return;
+    
+    if (referencedMessage.pinned && referencedMessage.author.bot) {
+      await message.delete().catch(error => {
+        console.error('Failed to delete message:', error);
+      });
+    }
+  } catch (error) {
+    console.error('Error in messageCreate handler:', error);
   }
 });
 
@@ -89,8 +104,15 @@ client.addListener("guildCreate", async (guild) => {
   Helper.setActivity();
 });
 
+client.on("presenceUpdate", (oldPresence, newPresence) => {
+  handleStreamThreads(newPresence)
+  
+});
+
 // Handle interactions (commands and autocomplete)
 client.on("interactionCreate", async (interaction) => {
+
+
   if (interaction.isAutocomplete()) {
     // Handle autocomplete for "removestreamer" command
     if (interaction.commandName === "removestreamer") {
@@ -144,6 +166,7 @@ client.on("interactionCreate", async (interaction) => {
     const { commandName, options } = interaction;
 
     switch (commandName) {
+      
       case "addstreamer":
         await Helper.handleAddStreamer(interaction, options);
         break;
@@ -165,6 +188,8 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
+
+
 
 /**
  * Discord bot singleton class

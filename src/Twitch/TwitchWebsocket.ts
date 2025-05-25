@@ -68,36 +68,45 @@ let listener: EventSubWsListener;
  * Initializes the Twitch API client, chat client, and event listeners.
  */
 export async function initializeClients() {
-  apiClient = new ApiClient({ authProvider });
-  listener = new EventSubWsListener({ apiClient });
-  listener.start();
-  MongoDB.getInstance().connect();
+  try {
+    apiClient = new ApiClient({ authProvider });
+    listener = new EventSubWsListener({ apiClient });
+    await listener.start();
+    await MongoDB.getInstance().connect();
 
-  const liveChannels = await Helper.getStreamersOnline();
-  if (liveChannels) {
-    DiscordBot.setStreamersOnline(liveChannels);
-  }
-
-  // Connect to chat channels
-  const channels = (await Streamer.find({}, { name: 1, _id: 0 })).map(
-    (streamer) => "#" + streamer.name
-  );
-  if (!channels) return;
-
-  chatClient = new ChatClient({
-    authProvider,
-    channels,
-  });
-
-  if (!chatClient) return;
-  chatClient.connect();
-
-  // Register chat event handlers
-  Object.entries(Helper.eventHandlers).forEach(([event, handler]) => {
-    if (event.startsWith("on") && event in chatClient!) {
-      (chatClient as any)[event](handler);
+    const liveChannels = await Helper.getStreamersOnline();
+    if (liveChannels) {
+      DiscordBot.setStreamersOnline(liveChannels);
     }
-  });
+
+    // Connect to chat channels
+    const channels = (await Streamer.find({}, { name: 1, _id: 0 })).map(
+      (streamer) => "#" + streamer.name
+    );
+    if (!channels) return;
+
+    chatClient = new ChatClient({
+      authProvider,
+      channels,
+    });
+
+    if (!chatClient) return;
+    await chatClient.connect();
+
+    // Register chat event handlers
+    Object.entries(Helper.eventHandlers).forEach(([event, handler]) => {
+      try {
+        if (event.startsWith("on") && event in chatClient!) {
+          (chatClient as any)[event](handler);
+        }
+      } catch (error) {
+        console.error(`Error registering event handler for ${event}:`, error);
+      }
+    });
+  } catch (error) {
+    console.error("Failed to initialize Twitch clients:", error);
+    throw error; // Re-throw to handle it in the calling function
+  }
 }
 
 // const guildConfig = new Schema({
@@ -123,20 +132,25 @@ export async function logMessage(
   msg?: ChatMessage,
   event?: string
 ): Promise<void> {
-  const formattedUsers: user[] = await Promise.all(
-    users
-      .filter((user): user is user => user !== null)
-      .map(async (user) => ({
-        user: user.user,
-        message: user.message,
-        profilePictureUrl:
-          user.profilePictureUrl ||
-          (
-            await Helper.getUserData(user.user)
-          ).profilePictureUrl,
-      }))
-  );
-  await DiscordBot.logAsUser(formattedUsers, channel, msg, event);
+  try {
+    const formattedUsers: user[] = await Promise.all(
+      users
+        .filter((user): user is user => user !== null)
+        .map(async (user) => ({
+          user: user.user,
+          message: user.message,
+          profilePictureUrl:
+            user.profilePictureUrl ||
+            (
+              await Helper.getUserData(user.user)
+            ).profilePictureUrl,
+        }))
+    );
+    await DiscordBot.logAsUser(formattedUsers, channel, msg, event);
+  } catch (error) {
+    console.error("Error logging message to Discord:", error);
+    throw error;
+  }
 }
 
 // ===================================
@@ -154,13 +168,18 @@ export async function logChatMessage(
   message: string,
   msg?: ChatMessage
 ): Promise<void> {
-  const pfp = (await Helper.getUserData(user)).profilePictureUrl;
-  const userName = msg?.userInfo.displayName || user;
-  await logMessage(
-    channel,
-    [{ message, user: userName, profilePictureUrl: pfp }],
-    msg
-  );
+  try {
+    const pfp = (await Helper.getUserData(user)).profilePictureUrl;
+    const userName = msg?.userInfo.displayName || user;
+    await logMessage(
+      channel,
+      [{ message, user: userName, profilePictureUrl: pfp }],
+      msg
+    );
+  } catch (error) {
+    console.error("Error logging chat message:", error);
+    throw error;
+  }
 }
 
 // ===================================
@@ -175,11 +194,16 @@ async function refreshTokens(): Promise<void> {
     );
 
     authProvider.onRefresh(async (userId: string, newTokenData: any) => {
-      await promises.writeFile(
-        "./tokens.json",
-        JSON.stringify(newTokenData, null, 4),
-        "utf-8"
-      );
+      try {
+        await promises.writeFile(
+          "./tokens.json",
+          JSON.stringify(newTokenData, null, 4),
+          "utf-8"
+        );
+      } catch (error) {
+        console.error("Error saving refreshed tokens:", error);
+        throw error;
+      }
     });
 
     await authProvider.addUser(CONFIG.userId, tokenData, [
@@ -192,15 +216,24 @@ async function refreshTokens(): Promise<void> {
     await initializeClients();
 
     // Register event listeners
-    listener.onChannelRedemptionAdd(CONFIG.userId, (data) =>
-      Helper.eventHandlers.onChannelRedemptionAdd(data)
-    );
+    listener.onChannelRedemptionAdd(CONFIG.userId, (data) => {
+      try {
+        Helper.eventHandlers.onChannelRedemptionAdd(data);
+      } catch (error) {
+        console.error("Error handling channel redemption:", error);
+      }
+    });
 
-    listener.onChannelUnban(CONFIG.userId, (data) =>
-      Helper.eventHandlers.onUnban(data)
-    );
+    listener.onChannelUnban(CONFIG.userId, (data) => {
+      try {
+        Helper.eventHandlers.onUnban(data);
+      } catch (error) {
+        console.error("Error handling channel unban:", error);
+      }
+    });
   } catch (error) {
     console.error("Failed to initialize auth:", error);
+    throw error;
   }
 }
 
@@ -236,9 +269,14 @@ class TwitchClient {
     userId: string,
     message: string
   ): Promise<void> {
-    return this.apiClient.asUser(userId, async () => {
-      await this.chatClient!.say(channel, message);
-    });
+    try {
+      return await this.apiClient.asUser(userId, async () => {
+        await this.chatClient!.say(channel, message);
+      });
+    } catch (error) {
+      console.error(`Error sending message to channel ${channel}:`, error);
+      throw error;
+    }
   }
 }
 
