@@ -79,6 +79,9 @@ export async function initializeClients() {
       DiscordBot.setStreamersOnline(liveChannels);
     }
 
+
+    
+
     // Connect to chat channels
     const channels = (await Streamer.find({}, { name: 1, _id: 0 })).map(
       (streamer) => "#" + streamer.name

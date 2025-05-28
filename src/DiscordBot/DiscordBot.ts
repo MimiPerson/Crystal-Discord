@@ -1,12 +1,7 @@
 import {
-  ApplicationEmoji,
   Client,
   GatewayIntentBits,
-
-  GuildMember,
-
-  UserResolvable,
-
+  Presence,
   Webhook,
 } from "discord.js";
 import config from "../config";
@@ -15,8 +10,8 @@ import { writeFile } from "fs/promises";
 import Helper from "./helperClass";
 import { MongoDB } from "../MongoDB/MongoDB";
 import { Streamer } from "../MongoDB/models/streamer.model";
-import { promises } from "fs";
 import handleStreamThreads from "./Helpers/handleStreamThreads";
+
 
 // Constants
 const BOT_TOKEN = config.token; // Bot token from configuration
@@ -46,6 +41,16 @@ client
       name: guild.name,
       members: guild.memberCount,
     }));
+
+    client.guilds.fetch("1173586671451770880").then(guild => {
+      guild.members.cache.forEach(member => {
+        if(member.user.bot) return;
+        const streamer = member.presence?.activities.find(a => a.name === "Twitch")
+        if(streamer) {
+          handleStreamThreads(member.presence as Presence)
+        }
+      })
+    })
 
     await writeFile("./guilds.json", JSON.stringify(guilds, null, 4), "utf-8");
   })
@@ -105,9 +110,12 @@ client.addListener("guildCreate", async (guild) => {
 });
 
 client.on("presenceUpdate", (oldPresence, newPresence) => {
-  handleStreamThreads(newPresence)
   
+  if(newPresence?.guild?.id === "1173586671451770880") {
+  handleStreamThreads(newPresence)
+  }
 });
+
 
 // Handle interactions (commands and autocomplete)
 client.on("interactionCreate", async (interaction) => {

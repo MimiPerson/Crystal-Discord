@@ -1,5 +1,5 @@
 import { ChatMessage } from "@twurple/chat";
-import { TextChannel, Webhook } from "discord.js";
+import { TextChannel, ThreadChannel, Webhook } from "discord.js";
 import DiscordBot from "../DiscordBot";
 
 /**
@@ -14,7 +14,7 @@ import DiscordBot from "../DiscordBot";
  */
 async function handleTwitchEvents(
   webhook: Webhook,
-  channel: TextChannel,
+  channel: TextChannel | ThreadChannel,
   user: string,
   formattedMessage: string,
   msg?: ChatMessage,

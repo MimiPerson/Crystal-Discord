@@ -1,5 +1,6 @@
 import { initializeClients } from "../Twitch/TwitchWebsocket";
-import handleAddStreamer from "./Helpers/handleAddStreamer";
+import { handleAddStreamer } from "./Helpers/handleAddStreamer";
+
 import handleRemoveStreamer from "./Helpers/handleRemoveStreamer";
 import { handleTwitchCommands } from "./Helpers/handleTwitchCommands";
 import handleTwitchEvents from "./Helpers/handleTwitchEvents";
