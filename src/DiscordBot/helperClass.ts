@@ -1,5 +1,6 @@
 import { initializeClients } from "../Twitch/TwitchWebsocket";
-import handleAddStreamer from "./Helpers/handleAddStreamer";
+import { handleAddStreamer } from "./Helpers/handleAddStreamer";
+
 import handleRemoveStreamer from "./Helpers/handleRemoveStreamer";
 import { handleTwitchCommands } from "./Helpers/handleTwitchCommands";
 import handleTwitchEvents from "./Helpers/handleTwitchEvents";
@@ -85,6 +86,31 @@ class Helper {
    * Handles Twitch-specific commands.
    */
   public static handleTwitchCommands = handleTwitchCommands;
+}
+
+interface Metrics {
+  commandsExecuted: number;
+  webhookCalls: number;
+  errors: Record<string, number>;
+  responseTime: number[];
+}
+
+class MetricsCollector {
+  private static metrics: Metrics = {
+    commandsExecuted: 0,
+    webhookCalls: 0,
+    errors: {},
+    responseTime: []
+  };
+
+  static trackCommand(command: string, duration: number) {
+    this.metrics.commandsExecuted++;
+    this.metrics.responseTime.push(duration);
+  }
+
+  static getMetrics(): Metrics {
+    return this.metrics;
+  }
 }
 
 export default Helper;

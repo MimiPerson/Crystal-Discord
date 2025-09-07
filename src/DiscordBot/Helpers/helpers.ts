@@ -2,8 +2,13 @@ import {
   ActivityType,
   CacheType,
   CommandInteraction,
-  EmbedBuilder,
+  
+ 
+  ForumChannel,
+  
+ 
   TextChannel,
+  ThreadChannel,
   Webhook,
 } from "discord.js";
 import { streamer } from "../interfaces";
@@ -43,10 +48,19 @@ function setActivity(): void {
  * @returns The existing or newly created webhook.
  */
 async function getOrCreateWebhook(
-  channel: TextChannel,
+  channel: TextChannel | ForumChannel,
   username: string,
   avatarUrl: string
 ): Promise<Webhook | null> {
+  if(channel instanceof ForumChannel) {
+    
+    const webhooks = await channel.fetchWebhooks()
+    return (webhooks?.find((wh) => wh.channelId === channel.id) || (await channel.createWebhook({
+      name: username,
+      avatar: avatarUrl,
+      
+    }))) as Webhook | null
+  };
   const webhooks = await channel.fetchWebhooks();
   return (
     webhooks.find((wh) => wh.channelId === channel.id) ||
@@ -73,15 +87,17 @@ async function sendWebhookMessage(
   content: string,
   username: string,
   avatarUrl: string,
-  permission: boolean
+  permission: boolean,
+  [channelId, isThread]: [string, boolean]
 ): Promise<void> {
-  if (
-    messageCache[0] === content &&
-    messageCache[1] > new Date(Date.now() - 5000)
-  ) {
-    return; // Prevent duplicate messages within 5 seconds.
-  }
-  messageCache = [content, new Date()];
+  // if (
+  //   messageCache[0] === content &&
+  //   messageCache[1] > new Date(Date.now() - 100)
+  // ) {
+  //   return ; // Prevent duplicate messages within 5 seconds.
+  // }
+  // messageCache = [content, new Date()];
+
 
   await webhook?.send({
     content,
@@ -89,6 +105,7 @@ async function sendWebhookMessage(
     avatarURL: avatarUrl,
     allowedMentions: { parse: ["users"] },
     flags: ["SuppressNotifications"],
+    threadId: isThread ? channelId : undefined
   });
 }
 

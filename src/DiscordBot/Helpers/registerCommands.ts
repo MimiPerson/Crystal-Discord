@@ -43,12 +43,7 @@ async function registerCommands(): Promise<void> {
                 required: true,
                 channel_types: [0], // Text channels only
               },
-              {
-                name: "updatechannel",
-                description: "Update channel name when live",
-                type: 5, // Boolean type
-                required: false,
-              },
+
               {
                 name: "livename",
                 description: "Channel name to use when live",
@@ -99,6 +94,18 @@ async function registerCommands(): Promise<void> {
         if (guild.id === "1173586671451770880") {
           commands.push(
             {
+              name: "testactivity",
+              description: "Test activity",
+              defaultMemberPermissions: "Administrator",
+              type: 1, // Slash command
+              options: [{
+                name: "user",
+                description: "User to test activity",
+                type: 6, // User type
+                required: true,
+              }]
+            },
+            {
               name: "raid",
               description: "Raid the channel",
               defaultMemberPermissions: "Administrator",
@@ -136,6 +143,7 @@ async function registerCommands(): Promise<void> {
                 },
               ],
             }
+            
           );
         }
 

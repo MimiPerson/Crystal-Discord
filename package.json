@@ -20,13 +20,12 @@
     "dotenv": "^16.4.7",
     "mongodb": "^6.15.0",
     "mongoose": "^8.13.1",
-    "twurple": "^1.0.0",
     "ws": "^8.18.1"
   },
   "devDependencies": {
     "@types/node": "^16.18.126",
     "@types/ws": "^8.18.0",
-    "discord.js": "^14.18.0",
+    "discord.js": "^14.19.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
   },

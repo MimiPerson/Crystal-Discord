@@ -1,6 +1,6 @@
 import { user } from "../interfaces";
 import DiscordBot from "../DiscordBot";
-import { Client, TextChannel } from "discord.js";
+import { Client, ForumChannel, TextChannel, ThreadChannel } from "discord.js";
 import {
   formatMessageWithEmojis,
   getOrCreateWebhook,
@@ -79,11 +79,11 @@ export async function logAsUser(
 function getDiscordChannel(
   client: Client,
   guildInfo: { guildId: string; channelId: string }
-): TextChannel | null {
+): TextChannel | ThreadChannel | null {
   const discordGuild = client.guilds.cache.get(guildInfo.guildId);
   const channel = discordGuild?.channels.cache.get(guildInfo.channelId);
 
-  return channel instanceof TextChannel ? channel : null;
+  return channel instanceof TextChannel || channel instanceof ThreadChannel ? channel : null;
 }
 
 /**
@@ -97,7 +97,7 @@ function getDiscordChannel(
  * @param twitchEvent - Optional Twitch event type.
  */
 async function sendMessageViaWebhook(
-  channel: TextChannel,
+  channel: TextChannel | ThreadChannel,
   user: user,
   formattedMessage: string,
   msg?: ChatMessage,
@@ -105,14 +105,16 @@ async function sendMessageViaWebhook(
   twitchEvent?: string
 ): Promise<void> {
   try {
+   
     const webhook = await getOrCreateWebhook(
-      channel,
+      channel instanceof ThreadChannel ? channel.parent as ForumChannel : channel as TextChannel,
       "Crystal Socket",
       "https://i.imgur.com/nrhRy0b.png"
     );
+    
+    if (!webhook) return 
 
-    if (!webhook) return;
-
+    
     formattedMessage = await parseMessage(channel, formattedMessage, msg);
 
     // Get pronouns and format username
@@ -151,12 +153,14 @@ async function sendMessageViaWebhook(
     }
 
     // Send the message via webhook
+   
     await sendWebhookMessage(
       webhook,
       formattedMessage,
       userName,
       user.profilePictureUrl ?? "https://i.imgur.com/nrhRy0b.png",
-      msg?.userInfo.isBroadcaster || msg?.userInfo.isMod || false
+      msg?.userInfo.isBroadcaster || msg?.userInfo.isMod || false,
+      [channel.id, channel.isThread()]
     );
   } catch (error) {
     if (channelKey) DiscordBot.webhookCache.delete(channelKey);
@@ -172,7 +176,7 @@ async function sendMessageViaWebhook(
  * @returns The parsed message.
  */
 async function parseMessage(
-  channel: TextChannel,
+  channel: TextChannel | ThreadChannel,
   formattedMessage: string,
   msg?: ChatMessage
 ): Promise<string> {

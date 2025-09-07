@@ -64,4 +64,39 @@ async function handleAddStreamer(interaction: any, options: any) {
     flags: 64,
   });
 }
-export default handleAddStreamer;
+
+// add streamer through bot 
+
+async function addStreamer(streamerName: string, guildId: string, channelId: string){
+
+  const streamerFetch = await TwitchClient.getApiClient().users.getUserByName(
+    streamerName
+  )
+  if(!streamerFetch) return console.log("streamer not found") ;
+
+  const streamerData = await Streamer.findOne({ name: streamerName });
+
+  const streamer =
+    streamerData ||
+    new Streamer({
+      name: streamerName,
+      createdAt: new Date(),
+    });
+
+    if(streamer.guilds.find(g => g.channelId === channelId)) return 
+
+    streamer.twitchId = streamerFetch?.id;
+  streamer.guilds.push({
+    guildId: guildId,
+    channelId: channelId
+  });
+  streamer.updatedAt = new Date();
+
+  await streamer.save();
+
+  Helper.registerCommands();
+  initializeClients();
+}
+
+
+export { handleAddStreamer, addStreamer };

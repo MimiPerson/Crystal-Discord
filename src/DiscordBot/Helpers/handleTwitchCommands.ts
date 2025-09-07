@@ -1,4 +1,4 @@
-import { EmbedBuilder, Message, TextChannel, Webhook } from "discord.js";
+import { EmbedBuilder, Message, TextChannel, ThreadChannel, Webhook } from "discord.js";
 import { user } from "../interfaces";
 import { ChatMessage } from "@twurple/chat";
 
@@ -15,7 +15,7 @@ export async function handleTwitchCommands(
   args: string[],
   forwarded: {
     webhook: Webhook;
-    channel: TextChannel;
+    channel: TextChannel | ThreadChannel;
     user: user;
     userName: string;
     formattedMessage: string;

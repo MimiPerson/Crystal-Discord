@@ -42,13 +42,15 @@ async function handleRemoveStreamer(
 
   if (streamer.guilds.length === 0) {
     await streamer.deleteOne();
+  } else {
+    streamer.updatedAt = new Date();
+    await streamer.save();
   }
+
   interaction.reply({
     content: `Streamer ${streamerToRemove} removed successfully.`,
     flags: 64,
   });
-  streamer.updatedAt = new Date();
-  await streamer.save();
   Helper.registerCommands();
 
   initializeClients();

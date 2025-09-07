@@ -21,17 +21,21 @@ const eventHandlers = {
   onUnfollow: async (
     followers: { user: string; userId: string; createdAt: string }[]
   ) => {
-    const userId = followers[0]?.userId;
-    if (messageTimeout === userId) return; // Prevent duplicate handling
+    try {
+      const userId = followers[0]?.userId;
+      if (messageTimeout === userId) return; // Prevent duplicate handling
 
-    messageTimeout = userId;
+      messageTimeout = userId;
 
-    const unfollowedUsers = followers.map((follower) => ({
-      user: follower.user,
-      message: `I have left the community 💀`,
-    }));
+      const unfollowedUsers = followers.map((follower) => ({
+        user: follower.user,
+        message: `I have left the community 💀`,
+      }));
 
-    await Helper.logMessage("mimi_py", unfollowedUsers);
+      await Helper.logMessage("mimi_py", unfollowedUsers);
+    } catch (error) {
+      console.error("Error handling unfollow event:", error);
+    }
   },
 
   /**
@@ -44,11 +48,15 @@ const eventHandlers = {
     message: string,
     msg: ChatMessage
   ) => {
-    if (messageTimeout === msg.id) return; // Prevent duplicate handling
+    try {
+      if (messageTimeout === msg.id) return; // Prevent duplicate handling
 
-    messageTimeout = msg.id;
+      messageTimeout = msg.id;
 
-    await Helper.logChatMessage(channel, user, message, msg);
+      await Helper.logChatMessage(channel, user, message, msg);
+    } catch (error) {
+      console.error(`Error handling message in channel ${channel}:`, error);
+    }
   },
 
   /**
@@ -61,11 +69,15 @@ const eventHandlers = {
     message: string,
     msg: ChatMessage
   ) => {
-    if (messageTimeout === msg.id) return; // Prevent duplicate handling
+    try {
+      if (messageTimeout === msg.id) return; // Prevent duplicate handling
 
-    messageTimeout = msg.id;
+      messageTimeout = msg.id;
 
-    await Helper.logChatMessage(channel, user, message, msg);
+      await Helper.logChatMessage(channel, user, message, msg);
+    } catch (error) {
+      console.error(`Error handling action in channel ${channel}:`, error);
+    }
   },
 
   /**
@@ -78,11 +90,15 @@ const eventHandlers = {
     announcementInfo: ChatAnnouncementInfo,
     notice: UserNotice
   ) => {
-    if (messageTimeout === notice.id) return; // Prevent duplicate handling
+    try {
+      if (messageTimeout === notice.id) return; // Prevent duplicate handling
 
-    messageTimeout = notice.id;
+      messageTimeout = notice.id;
 
-    await Helper.logMessage(channel, [{ message: `*${notice.text}*`, user }]);
+      await Helper.logMessage(channel, [{ message: `*${notice.text}*`, user }]);
+    } catch (error) {
+      console.error(`Error handling announcement in channel ${channel}:`, error);
+    }
   },
 
   /**
@@ -90,68 +106,80 @@ const eventHandlers = {
 
    */
   onBan: async (channel: string, user: string) => {
-    if (messageTimeout === channel) return; // Prevent duplicate handling
+    try {
+      if (messageTimeout === channel) return; // Prevent duplicate handling
 
-    messageTimeout = channel;
+      messageTimeout = channel;
 
-    await Helper.logMessage(
-      channel,
-      [
-        {
-          message: `https://tenor.com/view/kaf-kafu-kamitsubaki-rim-rime-gif-27228643`,
-          user,
-        },
-      ],
-      undefined,
-      "onBan"
-    );
+      await Helper.logMessage(
+        channel,
+        [
+          {
+            message: `https://tenor.com/view/kaf-kafu-kamitsubaki-rim-rime-gif-27228643`,
+            user,
+          },
+        ],
+        undefined,
+        "onBan"
+      );
+    } catch (error) {
+      console.error(`Error handling ban in channel ${channel}:`, error);
+    }
   },
 
   /**
    * Handles user unban events.
    */
   onUnban: async (data: EventSubChannelUnbanEvent) => {
-    if (messageTimeout === data.userId) return; // Prevent duplicate handling
+    try {
+      if (messageTimeout === data.userId) return; // Prevent duplicate handling
 
-    messageTimeout = data.userId;
+      messageTimeout = data.userId;
 
-    await Helper.logMessage(
-      data.broadcasterName,
-      [
-        {
-          message: `https://tenor.com/view/im-back-killua-killua-zoldyck-anime-discord-gif-21123576`,
-          user: data.userDisplayName,
-        },
-      ],
-      undefined,
-      "onUnban"
-    );
+      await Helper.logMessage(
+        data.broadcasterName,
+        [
+          {
+            message: `https://tenor.com/view/im-back-killua-killua-zoldyck-anime-discord-gif-21123576`,
+            user: data.userDisplayName,
+          },
+        ],
+        undefined,
+        "onUnban"
+      );
+    } catch (error) {
+      console.error(`Error handling unban for user ${data.userDisplayName}:`, error);
+    }
   },
 
   /**
    * Handles channel point redemption events.
    */
   onChannelRedemptionAdd: async (data: EventSubChannelRedemptionAddEvent) => {
-    const redemptionDate = data.redemptionDate.toDateString();
-    if (messageTimeout === redemptionDate) return; // Prevent duplicate handling
+    try {
+      const redemptionDate = data.redemptionDate.toDateString();
+      if (messageTimeout === redemptionDate) return; // Prevent duplicate handling
 
-    messageTimeout = redemptionDate;
+      messageTimeout = redemptionDate;
 
-    const users: user[] = [
-      {
-        message: `Redeemed ${data.rewardTitle} for ${data.userDisplayName}`,
-        user: "Channel Point Redeem",
-        profilePictureUrl: "https://i.imgur.com/FJUEIhs.png",
-      },
-      data.input
-        ? {
-            message: `*${data.input}*`,
-            user: data.userDisplayName,
-          }
-        : null,
-    ].filter((u): u is user => u !== null); // Filter out null values
+      const users: user[] = [
+        {
+          message: `Redeemed ${data.rewardTitle} for ${data.userDisplayName}`,
+          user: "Channel Point Redeem",
+          profilePictureUrl: "https://i.imgur.com/FJUEIhs.png",
+        },
+        data.input
+          ? {
+              message: `*${data.input}*`,
+              user: data.userDisplayName,
+            }
+          : null,
+      ].filter((u): u is user => u !== null); // Filter out null values
 
-    await Helper.logMessage(data.broadcasterName, users);
+      await Helper.logMessage(data.broadcasterName, users);
+    } catch (error) {
+      console.error(`Error handling channel point redemption for ${data.userDisplayName}:`, error);
+    }
   },
 
   /**
@@ -164,16 +192,20 @@ const eventHandlers = {
     duration: number,
     msg: ClearChat
   ) => {
-    if (messageTimeout === user) return; // Prevent duplicate handling
+    try {
+      if (messageTimeout === user) return; // Prevent duplicate handling
 
-    messageTimeout = user;
+      messageTimeout = user;
 
-    await Helper.logMessage(channel, [
-      {
-        message: `https://tenor.com/view/yae-yae-miko-yae-sakura-bonk-anime-yae-bonk-gif-26001721`,
-        user,
-      },
-    ]);
+      await Helper.logMessage(channel, [
+        {
+          message: `https://tenor.com/view/yae-yae-miko-yae-sakura-bonk-anime-yae-bonk-gif-26001721`,
+          user,
+        },
+      ]);
+    } catch (error) {
+      console.error(`Error handling timeout in channel ${channel}:`, error);
+    }
   },
 };
 
