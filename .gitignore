@@ -1,7 +1,0 @@
-.env
-node_modules
-dist
-*.json
-bun.lock
-package-lock.json
-.gitignore
