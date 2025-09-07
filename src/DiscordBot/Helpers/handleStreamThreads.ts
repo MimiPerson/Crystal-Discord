@@ -7,14 +7,14 @@ import { addStreamer } from "./handleAddStreamer";
 async function handleStreamThreads(presense: Presence) {
     const client = DiscordBot.getClient()
   const guild = client.guilds.cache.get("1173586671451770880");
-  const forum = await guild?.channels.fetch("1375180619641786560") as ForumChannel
+  const forum = await guild?.channels.fetch("1375180619641786560") as ForumChannel | null
   
 
   
   const streamer = presense.activities.find(a => a.name === "Twitch");
   const streamerName = streamer?.url?.replace("https://www.twitch.tv/", "");
 
-  if(streamerName && streamer && guild?.id){
+  if(streamerName && streamer && guild?.id && forum){
 
   
 

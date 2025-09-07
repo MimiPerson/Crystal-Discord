@@ -42,15 +42,7 @@ client
       members: guild.memberCount,
     }));
 
-    client.guilds.fetch("1173586671451770880").then(guild => {
-      guild.members.cache.forEach(member => {
-        if(member.user.bot) return;
-        const streamer = member.presence?.activities.find(a => a.name === "Twitch")
-        if(streamer) {
-          handleStreamThreads(member.presence as Presence)
-        }
-      })
-    })
+   
 
     await writeFile("./guilds.json", JSON.stringify(guilds, null, 4), "utf-8");
   })
@@ -109,12 +101,6 @@ client.addListener("guildCreate", async (guild) => {
   Helper.setActivity();
 });
 
-client.on("presenceUpdate", (oldPresence, newPresence) => {
-  
-  if(newPresence?.guild?.id === "1173586671451770880") {
-  handleStreamThreads(newPresence)
-  }
-});
 
 
 // Handle interactions (commands and autocomplete)

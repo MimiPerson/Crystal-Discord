@@ -20,7 +20,6 @@
     "dotenv": "^16.4.7",
     "mongodb": "^6.15.0",
     "mongoose": "^8.13.1",
-    "twurple": "^1.0.0",
     "ws": "^8.18.1"
   },
   "devDependencies": {
