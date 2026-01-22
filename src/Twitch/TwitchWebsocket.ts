@@ -11,6 +11,7 @@ import DiscordBot from "../DiscordBot/DiscordBot";
 import Helper from "./helperClass";
 import { MongoDB } from "../MongoDB/MongoDB";
 import { Streamer } from "../MongoDB/models/streamer.model";
+import { ClipConfig } from "../MongoDB/models/clips.model";
 
 // ===================================
 // Validate required environment variables
@@ -25,7 +26,7 @@ const validateEnv = () => {
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missing.join(", ")}\n` +
-        "Make sure you have a .env file in the root directory or environment variables set on your VPS."
+      "Make sure you have a .env file in the root directory or environment variables set on your VPS."
     );
   }
 };
@@ -80,13 +81,17 @@ export async function initializeClients() {
     }
 
 
-    
+
 
     // Connect to chat channels
-    const channels = (await Streamer.find({}, { name: 1, _id: 0 })).map(
+    const channels = [... new Set((await Promise.all((await Streamer.find({}, { name: 1, _id: 0 })).map(
       (streamer) => "#" + streamer.name
-    );
-    if (!channels) return;
+    ))).concat(await Promise.all((await ClipConfig.find({}))
+      .map(async (clipConfig) => {
+        return "#" + clipConfig.streamerName;
+      }))))];
+
+    if (channels.length === 0) return;
 
     chatClient = new ChatClient({
       authProvider,
@@ -217,6 +222,7 @@ async function refreshTokens(): Promise<void> {
 
     await authProvider.refreshAccessTokenForUser(CONFIG.userId);
     await initializeClients();
+
 
     // Register event listeners
     listener.onChannelRedemptionAdd(CONFIG.userId, (data) => {

@@ -1,4 +1,6 @@
 import {
+  CacheType,
+  ChatInputCommandInteraction,
   Client,
   GatewayIntentBits,
   Presence,
@@ -10,7 +12,6 @@ import { writeFile } from "fs/promises";
 import Helper from "./helperClass";
 import { MongoDB } from "../MongoDB/MongoDB";
 import { Streamer } from "../MongoDB/models/streamer.model";
-import handleStreamThreads from "./Helpers/handleStreamThreads";
 
 
 // Constants
@@ -42,7 +43,7 @@ client
       members: guild.memberCount,
     }));
 
-   
+
 
     await writeFile("./guilds.json", JSON.stringify(guilds, null, 4), "utf-8");
   })
@@ -54,10 +55,10 @@ client
 client.on("messageCreate", async (message) => {
   try {
     if (!message.reference) return;
-    
+
     const referencedMessage = await message.fetchReference().catch(() => null);
     if (!referencedMessage) return;
-    
+
     if (referencedMessage.pinned && referencedMessage.author.bot) {
       await message.delete().catch(error => {
         console.error('Failed to delete message:', error);
@@ -157,10 +158,16 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isCommand()) {
     // Handle commands
-    const { commandName, options } = interaction;
+    const { commandName, options } = interaction as ChatInputCommandInteraction<CacheType>;
 
     switch (commandName) {
-      
+      case "saveclips":
+        await Helper.handleSaveClips(interaction, options);
+        break;
+      case "removeclips":
+        await Helper.handleRemoveClips(interaction, options);
+        break;
+
       case "addstreamer":
         await Helper.handleAddStreamer(interaction, options);
         break;
@@ -197,7 +204,7 @@ class DiscordBot {
   public static readonly setStreamersOnline = Helper.setStreamersOnline;
   public static readonly Helper = Helper;
 
-  private constructor() {}
+  private constructor() { }
 
   /**
    * Get the Discord client instance

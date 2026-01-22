@@ -5,18 +5,20 @@ import {
   UserNotice,
 } from "@twurple/chat";
 import Helper from "../helperClass";
+import DiscordHelper from "../../DiscordBot/helperClass";
 import {
   EventSubChannelRedemptionAddEvent,
   EventSubChannelUnbanEvent,
 } from "@twurple/eventsub-base";
 import { user } from "../../DiscordBot/interfaces";
+import { ClipConfig } from "../../MongoDB/models/clips.model";
 
 // Event handlers for Twitch events
 let messageTimeout = ""; // Used to prevent duplicate handling of the same event
 
 const eventHandlers = {
   /**
-   * Handles unfollow events.
+   * Handles unfollow events. 
    */
   onUnfollow: async (
     followers: { user: string; userId: string; createdAt: string }[]
@@ -50,8 +52,19 @@ const eventHandlers = {
   ) => {
     try {
       if (messageTimeout === msg.id) return; // Prevent duplicate handling
-
       messageTimeout = msg.id;
+
+      const streamerConfig = await ClipConfig.findOne({ streamerName: channel.replace("#", "") })
+      if (streamerConfig) {
+        const clipRegex = /https:\/\/www\.twitch\.tv\/[A-Za-z0-9]+_[A-Za-z0-9]+\/clip\/([A-Za-z0-9]+(-[A-Za-z0-9]+)+)/;
+        const clipMatch = clipRegex.test(message);
+        if (clipMatch) {
+          streamerConfig.roles
+          const link = message.split(" ").filter(word => word.includes("https://www.twitch.tv/"))[0];
+
+          await DiscordHelper.saveClips(link, streamerConfig, msg);
+        }
+      }
 
       await Helper.logChatMessage(channel, user, message, msg);
     } catch (error) {
@@ -170,9 +183,9 @@ const eventHandlers = {
         },
         data.input
           ? {
-              message: `*${data.input}*`,
-              user: data.userDisplayName,
-            }
+            message: `*${data.input}*`,
+            user: data.userDisplayName,
+          }
           : null,
       ].filter((u): u is user => u !== null); // Filter out null values
 

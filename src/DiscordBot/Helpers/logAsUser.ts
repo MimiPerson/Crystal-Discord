@@ -76,7 +76,7 @@ export async function logAsUser(
  * @param guildInfo - Object containing guildId and channelId.
  * @returns The TextChannel object or null if not found.
  */
-function getDiscordChannel(
+export function getDiscordChannel(
   client: Client,
   guildInfo: { guildId: string; channelId: string }
 ): TextChannel | ThreadChannel | null {
@@ -96,7 +96,7 @@ function getDiscordChannel(
  * @param channelKey - Unique key for the channel (guildId-channelId).
  * @param twitchEvent - Optional Twitch event type.
  */
-async function sendMessageViaWebhook(
+export async function sendMessageViaWebhook(
   channel: TextChannel | ThreadChannel,
   user: user,
   formattedMessage: string,
@@ -105,16 +105,16 @@ async function sendMessageViaWebhook(
   twitchEvent?: string
 ): Promise<void> {
   try {
-   
+
     const webhook = await getOrCreateWebhook(
       channel instanceof ThreadChannel ? channel.parent as ForumChannel : channel as TextChannel,
       "Crystal Socket",
       "https://i.imgur.com/nrhRy0b.png"
     );
-    
-    if (!webhook) return 
 
-    
+    if (!webhook) return
+
+
     formattedMessage = await parseMessage(channel, formattedMessage, msg);
 
     // Get pronouns and format username
@@ -153,7 +153,7 @@ async function sendMessageViaWebhook(
     }
 
     // Send the message via webhook
-   
+
     await sendWebhookMessage(
       webhook,
       formattedMessage,
@@ -185,8 +185,8 @@ async function parseMessage(
   const emoteOffset =
     msg?.emoteOffsets instanceof Map
       ? Array.from(msg.emoteOffsets.entries())
-          .map(([key, value]) => `${key}:${value.join(",")}`)
-          .join("/")
+        .map(([key, value]) => `${key}:${value.join(",")}`)
+        .join("/")
       : "";
 
   // Replace mentions with Discord user mentions
@@ -321,7 +321,6 @@ export function formatEmoteName(emoteName: string): string {
  * @returns The formatted username.
  */
 function formatUsername(username: string, pronouns: string): string {
-  return `${
-    username.toLowerCase() === "mimi_py" ? "👑Mimi_py" : username
-  }${pronouns}`;
+  return `${username.toLowerCase() === "mimi_py" ? "👑Mimi_py" : username
+    }${pronouns}`;
 }

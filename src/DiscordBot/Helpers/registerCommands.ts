@@ -6,6 +6,7 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import { Streamer } from "../../MongoDB/models/streamer.model";
+import { ClipConfig } from "../../MongoDB/models/clips.model";
 
 /**
  * Registers slash commands for the Discord bot.
@@ -22,7 +23,10 @@ async function registerCommands(): Promise<void> {
       try {
         // Fetch streamer choices for the current guild
         const streamerNames = await getStreamerChoices(guild.id);
-
+        const clipConfig = await ClipConfig.find({ guildId: guild.id });
+        const clipRoles: any = () => { return Array.from(new Set(clipConfig.map(clipRole => clipRole.roles).flat())) };
+        const clipStreamers: any = () => { return Array.from(new Set(clipConfig.map(clipRole => clipRole.streamerName))) };
+        const clipChannels: any = () => { return Array.from(new Set(clipConfig.map(clipRole => clipRole.channelId))) };
         // Define the base set of commands
         const commands: ApplicationCommandDataResolvable[] = [
           {
@@ -63,6 +67,95 @@ async function registerCommands(): Promise<void> {
             description: "List all monitored streamers",
             defaultMemberPermissions: "Administrator",
           },
+          {
+            name: "removeclips",
+            description: "Remove clips from the channel",
+            defaultMemberPermissions: "Administrator",
+            options: [
+              {
+                name: "streamer",
+                description: "Streamer to remove clips from",
+                type: 3, // String type
+                required: true,
+                choices: clipStreamers().map((streamer: string) => {
+                  return {
+                    name: streamer,
+                    value: streamer,
+                  }
+                }),
+              },
+              {
+                name: "channel",
+                description: "Channel to remove clips from",
+                type: 3, // String type
+                required: true,
+
+                choices: clipChannels().map((channel: string) => ({
+                  name: guild?.channels.cache.get(channel)?.name || "",
+                  value: guild?.channels.cache.get(channel)?.id || "",
+                })),
+
+
+              },
+              {
+                name: "roles",
+                description: "Remove clips for these roles",
+                type: 3, // string type
+                required: true,
+                choices: clipRoles().map((role: string) => {
+                  return {
+                    name: role,
+                    value: role,
+                  }
+                })
+
+              }
+            ],
+          },
+          {
+            name: "saveclips",
+            description: "Save clips from the channel",
+            defaultMemberPermissions: "Administrator",
+            options: [
+              {
+                name: "streamer",
+                description: "Streamer to save clips from",
+                type: 3, // String type
+                required: true,
+              },
+              {
+                name: "channel",
+                description: "Channel to save clips from",
+                type: 7, // Channel type
+                required: true,
+              },
+              {
+                name: "roles",
+                description: "save clips for these roles",
+                type: 3, // string type
+                required: true,
+                choices: [
+                  {
+                    name: "moderator",
+                    value: "moderator",
+                  },
+                  {
+                    name: "broadcaster",
+                    value: "broadcaster",
+                  },
+                  {
+                    name: "bot",
+                    value: "bot",
+                  },
+                  {
+                    name: "all",
+                    value: "all",
+                  }
+                ]
+
+              }
+            ],
+          }
         ];
 
         // Add the "removestreamer" command if there are any streamers
@@ -143,7 +236,7 @@ async function registerCommands(): Promise<void> {
                 },
               ],
             }
-            
+
           );
         }
 
@@ -158,6 +251,7 @@ async function registerCommands(): Promise<void> {
   // Wait for all command updates to complete
   await Promise.all(updatePromises);
 }
+
 
 /**
  * Fetches a list of streamer choices for a specific guild.

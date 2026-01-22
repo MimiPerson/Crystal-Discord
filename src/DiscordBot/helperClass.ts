@@ -2,6 +2,7 @@ import { initializeClients } from "../Twitch/TwitchWebsocket";
 import { handleAddStreamer } from "./Helpers/handleAddStreamer";
 
 import handleRemoveStreamer from "./Helpers/handleRemoveStreamer";
+import { handleRemoveClips, handleSaveClips } from "./Helpers/handleClips";
 import { handleTwitchCommands } from "./Helpers/handleTwitchCommands";
 import handleTwitchEvents from "./Helpers/handleTwitchEvents";
 import { handleListStreamers, setActivity } from "./Helpers/helpers";
@@ -16,12 +17,19 @@ import {
   handleRaid,
   handleUnraid,
 } from "./Helpers/twitchCommands";
+import { saveClips } from "./Helpers/saveClips";
 
 /**
  * A utility class that provides static methods for managing streamers,
  * handling Discord bot commands, and performing various bot-related actions.
  */
 class Helper {
+  public static handleRemoveClips = handleRemoveClips;
+
+  public static saveClips = saveClips;
+
+
+  public static handleSaveClips = handleSaveClips;
   /**
    * Handles the addition of a new streamer.
    */
