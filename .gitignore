@@ -1,7 +1,10 @@
 .env
 node_modules
 dist
-*.json
+followers.json
 bun.lock
 package-lock.json
-.gitignore
+guilds.json
+env.json
+tokens.json
+todo.md
