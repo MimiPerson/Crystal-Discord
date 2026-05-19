@@ -321,6 +321,14 @@ export function formatEmoteName(emoteName: string): string {
  * @returns The formatted username.
  */
 function formatUsername(username: string, pronouns: string): string {
-  return `${username.toLowerCase() === "mimi_py" ? "👑Mimi_py" : username
+
+  let formattedUsername = username;
+  if (username.toLowerCase() === "mimi_py") {
+    formattedUsername = "👑Mimi_py";
+  }
+  if(username.toLowerCase() === "jetlagdown" || username.toLowerCase() === "jacknytely") {
+    formattedUsername = "Gay AI using furry";
+  }
+  return `${formattedUsername
     }${pronouns}`;
 }

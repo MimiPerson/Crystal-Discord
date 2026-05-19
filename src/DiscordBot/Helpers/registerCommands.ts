@@ -27,6 +27,7 @@ async function registerCommands(): Promise<void> {
         const clipRoles: any = () => { return Array.from(new Set(clipConfig.map(clipRole => clipRole.roles).flat())) };
         const clipStreamers: any = () => { return Array.from(new Set(clipConfig.map(clipRole => clipRole.streamerName))) };
         const clipChannels: any = () => { return Array.from(new Set(clipConfig.map(clipRole => clipRole.channelId))) };
+        console.log(clipChannels());
         // Define the base set of commands
         const commands: ApplicationCommandDataResolvable[] = [
           {
@@ -78,6 +79,7 @@ async function registerCommands(): Promise<void> {
                 type: 3, // String type
                 required: true,
                 choices: clipStreamers().map((streamer: string) => {
+                  console.log("streamer", streamer);
                   return {
                     name: streamer,
                     value: streamer,
